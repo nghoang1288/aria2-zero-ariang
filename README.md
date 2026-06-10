@@ -1,5 +1,15 @@
 # aria2-zero + AriaNg WebUI + SMB Server in Docker
 
+## Repository Overview
+
+This repository contains all the necessary source configurations to build a unified, multi-platform Docker container combining **aria2-zero**, **AriaNg WebUI**, and a **Samba (SMB) Server**.
+
+The goal of this project is to simplify self-hosted downloading by enabling:
+* **Zero-Config Downloading**: Control your downloads from a premium Web UI (AriaNg) served natively.
+* **Instant File Sharing**: Access completed downloads instantly on Windows Explorer, macOS Finder, or network-enabled media players (VLC, Kodi, Infuse) via SMB.
+* **Multi-Arch Support**: Runs seamlessly on standard `x86_64` (Intel/AMD) machines as well as `arm64` (Apple Silicon, Raspberry Pi 4/5) devices.
+* **Port Consolidation**: Nginx handles proxying to combine both the Web UI and JSON-RPC traffic on a single port (port `80`), solving CORS and mixed-content issues.
+
 A lightweight, multi-architecture (`amd64` / `arm64`) Docker container that bundles:
 1. **aria2-zero**: A high-performance download utility (compiled via MSVC/xmake fork).
 2. **AriaNg WebUI**: A modern, responsive web-based frontend for Aria2.
