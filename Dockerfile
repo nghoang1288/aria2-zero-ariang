@@ -44,11 +44,15 @@ RUN chmod +x /usr/local/bin/aria2c
 # Remove default nginx pages and copy AriaNg files
 RUN rm -rf /var/www/html/*
 COPY --from=builder /tmp/ariang/ /var/www/html/
+COPY custom.css /var/www/html/custom.css
 
 # Pre-configure AriaNg to dynamically connect to the current host and port via WebSockets
 RUN sed -i 's/rpcHost:""/rpcHost:location.hostname/g' /var/www/html/js/aria-ng-*.js && \
     sed -i 's/rpcPort:"6800"/rpcPort:(location.port?location.port:(location.protocol==="https:"?"443":"80"))/g' /var/www/html/js/aria-ng-*.js && \
     sed -i 's/protocol:"http"/protocol:(location.protocol==="https:"?"wss":"ws")/g' /var/www/html/js/aria-ng-*.js
+
+# Inject custom modern stylesheet into index.html
+RUN sed -i 's|</head>|<link rel="stylesheet" href="custom.css"></head>|g' /var/www/html/index.html
 
 # Copy configurations
 COPY nginx.conf /etc/nginx/sites-available/default
