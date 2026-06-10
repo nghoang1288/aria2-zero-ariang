@@ -41,9 +41,9 @@ fi
 # Ensure permissions on configuration and downloads folders
 chmod -R 777 "$DOWNLOAD_DIR" "$CONF_DIR"
 
-# Generate config.js for AriaNg containing the RPC Secret from environment variables
+# Generate config.js for AriaZero containing the RPC Secret from environment variables
 cat <<EOF > /var/www/html/config.js
-window.AriaNgServerConfig = {
+window.AriaZeroServerConfig = {
   rpcSecret: "${ARIA2_RPC_SECRET}"
 };
 EOF

@@ -94,7 +94,7 @@ export function formatETA(completed: string, total: string, speed: string): stri
 
 declare global {
   interface Window {
-    AriaNgServerConfig?: {
+    AriaZeroServerConfig?: {
       rpcSecret?: string;
     };
   }
@@ -118,7 +118,7 @@ export function useAria2() {
   const pollIntervalRef = useRef<number | null>(null);
 
   // Retrieve secret from injected config
-  const rpcSecret = window.AriaNgServerConfig ? window.AriaNgServerConfig.rpcSecret : '';
+  const rpcSecret = window.AriaZeroServerConfig ? window.AriaZeroServerConfig.rpcSecret : '';
 
   useEffect(() => {
     connect();
