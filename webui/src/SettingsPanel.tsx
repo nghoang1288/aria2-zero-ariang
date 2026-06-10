@@ -111,7 +111,7 @@ const SECTIONS: SectionDef[] = [
 // Debounce hook
 // ---------------------------------------------------------------------------
 
-function useDebouncedCallback<T extends (...args: unknown[]) => void>(fn: T, delay: number): T {
+function useDebouncedCallback<T extends (...args: any[]) => void>(fn: T, delay: number): T {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fnRef = useRef(fn);
   fnRef.current = fn;
@@ -119,7 +119,7 @@ function useDebouncedCallback<T extends (...args: unknown[]) => void>(fn: T, del
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
   return useCallback(
-    ((...args: unknown[]) => {
+    ((...args: any[]) => {
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => fnRef.current(...args), delay);
     }) as T,

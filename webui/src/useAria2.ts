@@ -160,14 +160,6 @@ export function useAria2() {
   sendRpcRef.current = sendRpc;
   sendBatchRpcRef.current = sendBatchRpc;
 
-  const poll = useCallback(() => {
-    sendBatchRpcRef.current([
-      { method: 'aria2.getGlobalStat', id: 'globalStat' },
-      { method: 'aria2.tellActive', id: 'active' },
-      { method: 'aria2.tellWaiting', params: [0, 1000], id: 'waiting' },
-      { method: 'aria2.tellStopped', params: [0, 1000], id: 'stopped' }
-    ]);
-  }, []);
 
   const fetchGlobalOptions = useCallback(() => {
     sendRpcRef.current('aria2.getGlobalOption', [], 'getGlobalOption');
@@ -200,13 +192,6 @@ export function useAria2() {
     }
   }, []);
 
-  const handleRpcMessage = useCallback((message: any) => {
-    if (Array.isArray(message)) {
-      message.forEach(res => handleSingleResponse(res));
-    } else {
-      handleSingleResponse(message);
-    }
-  }, [handleSingleResponse]);
 
   const cleanup = useCallback(() => {
     if (socketRef.current) {
