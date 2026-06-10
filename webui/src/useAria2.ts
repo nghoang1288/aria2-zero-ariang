@@ -107,6 +107,13 @@ function getRpcSecret(): string {
   return window.AriaZeroServerConfig?.rpcSecret || '';
 }
 
+export interface Aria2Event {
+  id: string;
+  type: 'complete' | 'error' | 'start' | 'pause' | 'stop';
+  gid: string;
+  timestamp: number;
+}
+
 export function useAria2() {
   const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
   const [globalStat, setGlobalStat] = useState<Aria2GlobalStat>({
@@ -120,6 +127,7 @@ export function useAria2() {
   const [waitingTasks, setWaitingTasks] = useState<Aria2Task[]>([]);
   const [stoppedTasks, setStoppedTasks] = useState<Aria2Task[]>([]);
   const [globalOptions, setGlobalOptions] = useState<Record<string, string>>({});
+  const [events, setEvents] = useState<Aria2Event[]>([]);
 
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
@@ -251,10 +259,12 @@ export function useAria2() {
           // Handle both batch and single responses, and aria2 notifications
           if (Array.isArray(res)) {
             res.forEach(r => handleSingleResponse(r));
+          } else if (res.method) {
+            // aria2 server-sent notification
+            handleAria2Notification(res);
           } else if (res.id) {
             handleSingleResponse(res);
           }
-          // else: aria2 notification (onDownloadStart etc.) - ignore
         } catch (e) {
           console.error('Failed to parse RPC response:', e);
         }
@@ -313,6 +323,40 @@ export function useAria2() {
     sendRpcRef.current('aria2.purgeDownloadResult', [], 'purge');
   }, []);
 
+  const handleAria2Notification = useCallback((msg: any) => {
+    const method = msg.method as string;
+    const gid = msg.params?.[0]?.gid as string;
+    if (!gid) return;
+
+    const typeMap: Record<string, Aria2Event['type']> = {
+      'aria2.onDownloadComplete': 'complete',
+      'aria2.onDownloadError': 'error',
+      'aria2.onDownloadStart': 'start',
+      'aria2.onDownloadPause': 'pause',
+      'aria2.onDownloadStop': 'stop',
+      'aria2.onBtDownloadComplete': 'complete',
+    };
+
+    const eventType = typeMap[method];
+    if (eventType) {
+      const event: Aria2Event = {
+        id: Date.now().toString(36) + Math.random().toString(36).slice(2),
+        type: eventType,
+        gid,
+        timestamp: Date.now(),
+      };
+      setEvents(prev => [...prev, event]);
+    }
+  }, []);
+
+  const acknowledgeEvent = useCallback((eventId: string) => {
+    setEvents(prev => prev.filter(e => e.id !== eventId));
+  }, []);
+
+  const clearEvents = useCallback(() => {
+    setEvents([]);
+  }, []);
+
   return {
     status,
     globalStat,
@@ -320,12 +364,15 @@ export function useAria2() {
     waitingTasks,
     stoppedTasks,
     globalOptions,
+    events,
     addUri,
     pauseTask,
     resumeTask,
     removeTask,
     clearStopped,
     fetchGlobalOptions,
-    updateGlobalOptions
+    updateGlobalOptions,
+    acknowledgeEvent,
+    clearEvents
   };
 }

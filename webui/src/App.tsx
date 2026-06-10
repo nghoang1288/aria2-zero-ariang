@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   ArrowDown, 
   ArrowUp, 
@@ -13,7 +13,8 @@ import {
   Activity, 
   Check, 
   AlertCircle,
-  X
+  X,
+  Link
 } from 'lucide-react';
 import { 
   useAria2, 
@@ -24,6 +25,8 @@ import {
 } from './useAria2';
 import type { Aria2Task } from './useAria2';
 import SettingsPanel from './SettingsPanel';
+import { SmartDownloadProvider, useSmartDownload } from './SmartDownload';
+import { useToast } from './Toast';
 
 function App() {
   const {
@@ -33,14 +36,18 @@ function App() {
     waitingTasks,
     stoppedTasks,
     globalOptions,
+    events,
     addUri,
     pauseTask,
     resumeTask,
     removeTask,
     clearStopped,
     fetchGlobalOptions,
-    updateGlobalOptions
+    updateGlobalOptions,
+    acknowledgeEvent
   } = useAria2();
+
+  const { showToast } = useToast();
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'downloads' | 'settings'>('dashboard');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -55,9 +62,72 @@ function App() {
     const uris = newUris.split('\n').map(u => u.trim()).filter(u => u);
     uris.forEach(uri => addUri(uri));
     
+    showToast({
+      type: 'info',
+      title: 'Download Started',
+      message: uris.length === 1 ? 'Task added to queue' : `${uris.length} tasks added to queue`,
+    });
+
     setNewUris('');
     setShowAddModal(false);
   };
+
+  // Smart download handler: when a link is detected from clipboard/magnet/drag
+  const handleLinkDetected = useCallback((url: string) => {
+    showToast({
+      type: 'info',
+      title: 'Link Detected',
+      message: url.length > 60 ? url.slice(0, 60) + '…' : url,
+      action: {
+        label: 'Download Now',
+        onClick: () => {
+          addUri(url);
+          showToast({
+            type: 'success',
+            title: 'Download Started',
+            message: 'Task added to queue',
+          });
+        },
+      },
+      duration: 8000,
+    });
+  }, [addUri, showToast]);
+
+  // Process aria2 events (download complete, error, etc.)
+  useEffect(() => {
+    if (events.length === 0) return;
+
+    for (const event of events) {
+      if (event.type === 'complete') {
+        showToast({
+          type: 'success',
+          title: 'Download Complete',
+          message: `Task ${event.gid} finished successfully`,
+        });
+        // Browser notification
+        if (Notification.permission === 'granted') {
+          new Notification('AriaZero — Download Complete', {
+            body: `Task ${event.gid} finished`,
+            icon: '/favicon.ico',
+          });
+        }
+      } else if (event.type === 'error') {
+        showToast({
+          type: 'error',
+          title: 'Download Error',
+          message: `Task ${event.gid} encountered an error`,
+        });
+      }
+      acknowledgeEvent(event.id);
+    }
+  }, [events, acknowledgeEvent, showToast]);
+
+  // Request browser notification permission once
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
 
   const getStatusBadge = () => {
     switch (status) {
@@ -94,7 +164,60 @@ function App() {
   const displayStopped = filteredTasks(stoppedTasks);
 
   return (
-    <div className="flex h-screen bg-[#0e111b] text-slate-100 overflow-hidden font-sans">
+    <SmartDownloadProvider onLinkDetected={handleLinkDetected}>
+      <AppContent
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        showAddModal={showAddModal}
+        setShowAddModal={setShowAddModal}
+        newUris={newUris}
+        setNewUris={setNewUris}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        handleAddTask={handleAddTask}
+        getStatusBadge={getStatusBadge}
+        globalStat={globalStat}
+        displayDownloads={displayDownloads}
+        displayStopped={displayStopped}
+        allActiveAndWaiting={allActiveAndWaiting}
+        status={status}
+        globalOptions={globalOptions}
+        pauseTask={pauseTask}
+        resumeTask={resumeTask}
+        removeTask={removeTask}
+        clearStopped={clearStopped}
+        fetchGlobalOptions={fetchGlobalOptions}
+        updateGlobalOptions={updateGlobalOptions}
+        addUri={addUri}
+      />
+    </SmartDownloadProvider>
+  );
+}
+
+// Separate inner component to use useSmartDownload (needs to be inside SmartDownloadProvider)
+function AppContent({
+  activeTab, setActiveTab, showAddModal, setShowAddModal,
+  newUris, setNewUris, searchQuery, setSearchQuery,
+  handleAddTask, getStatusBadge, globalStat,
+  displayDownloads, displayStopped, allActiveAndWaiting,
+  status, globalOptions, pauseTask, resumeTask, removeTask, clearStopped,
+  fetchGlobalOptions, updateGlobalOptions, addUri,
+}: any) {
+  const { isDragging } = useSmartDownload();
+
+  return (
+    <div className="flex h-screen bg-[#0e111b] text-slate-100 overflow-hidden font-sans relative">
+
+      {/* Drag & Drop Overlay */}
+      {isDragging && (
+        <div className="absolute inset-0 z-[100] bg-[#0e111b]/80 backdrop-blur-md flex items-center justify-center">
+          <div className="border-2 border-dashed border-cyan-500/50 rounded-2xl p-16 flex flex-col items-center gap-4 animate-pulse">
+            <Link className="w-12 h-12 text-cyan-400" />
+            <span className="text-lg font-semibold text-cyan-400">Drop links here to download</span>
+            <span className="text-xs text-slate-400">Release to add download task</span>
+          </div>
+        </div>
+      )}
       
       {/* Sidebar */}
       <aside className="w-64 bg-[#151926] border-r border-[#1e293b] flex flex-col">
@@ -356,8 +479,9 @@ function App() {
 
         {/* Global speed indicator at bottom */}
         <footer className="h-12 bg-[#151926] border-t border-[#1e293b] flex items-center justify-between px-8 text-xs text-slate-400">
-          <div>
-            AriaZero v1.0.0 (Nordic Frost Theme)
+          <div className="flex items-center gap-3">
+            <span>AriaZero v1.1.0</span>
+            <span className="text-[10px] text-slate-600">Clipboard • Magnet • Drag&Drop</span>
           </div>
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-1.5">
