@@ -21,11 +21,11 @@ try:
 
     # 1. Pull the latest image
     print("Pulling latest image from Docker Hub...")
-    out, err = run_ssh_cmd(ssh, "docker pull illusion1208/aria2-zero-ariazero:latest")
+    out, err = run_ssh_cmd(ssh, "docker pull illusion1208/ariazero:latest")
     print(out)
 
     # 2. Check if container already exists
-    out, err = run_ssh_cmd(ssh, "docker ps -a --filter name=aria2-zero-ariazero --format '{{.ID}}'")
+    out, err = run_ssh_cmd(ssh, "docker ps -a --filter name=ariazero --format '{{.ID}}'")
     container_ids = [c.strip() for c in out.strip().split('\n') if c.strip()]
 
     if container_ids:
@@ -41,7 +41,7 @@ try:
     # Secret key set to 'armageddon'
     run_cmd = (
         "docker run -d "
-        "--name aria2-zero-ariazero "
+        "--name ariazero "
         "-p 16980:80 "
         "-p 16800:6800 "
         "-p 445:445 "
@@ -49,7 +49,7 @@ try:
         "-v /home/illusion88/aria2/downloads:/downloads "
         "-e ARIA2_RPC_SECRET=armageddon "
         "--restart unless-stopped "
-        "illusion1208/aria2-zero-ariazero:latest"
+        "illusion1208/ariazero:latest"
     )
 
     print("Starting new container...")
@@ -59,7 +59,7 @@ try:
     print(f"Success! Container started. ID: {out.strip()}")
 
     # 4. Check docker ps to verify it's running
-    out, err = run_ssh_cmd(ssh, "docker ps --filter name=aria2-zero-ariazero")
+    out, err = run_ssh_cmd(ssh, "docker ps --filter name=ariazero")
     print("Active container status:")
     print(out)
 

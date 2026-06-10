@@ -34,6 +34,6 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/aria2-zero-ariazero:latest
-            ${{ secrets.DOCKER_USERNAME }}/aria2-zero-ariazero:${{ github.ref_name }}
-            ${{ secrets.DOCKER_USERNAME }}/aria2-zero-ariazero:${{ github.sha }}
+            ${{ secrets.DOCKER_USERNAME }}/ariazero:latest
+            ${{ secrets.DOCKER_USERNAME }}/ariazero:${{ github.ref_name }}
+            ${{ secrets.DOCKER_USERNAME }}/ariazero:${{ github.sha }}

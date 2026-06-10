@@ -35,14 +35,14 @@ Start the container with default Samba credentials (`admin` / `123456`):
 
 ```bash
 docker run -d \
-  --name aria2-zero-ariazero \
+  --name ariazero \
   -p 16980:80 \
   -p 16800:6800 \
   -p 445:445 \
   -v /path/to/downloads:/downloads \
   -v /path/to/config:/config \
   --restart unless-stopped \
-  illusion1208/aria2-zero-ariazero:latest
+  illusion1208/ariazero:latest
 ```
 
 ### 2. Secure Run (Custom SMB Credentials & RPC Password)
@@ -50,7 +50,7 @@ For safety, you can add an RPC secret and secure the SMB share using custom cred
 
 ```bash
 docker run -d \
-  --name aria2-zero-ariazero \
+  --name ariazero \
   -p 16980:80 \
   -p 16800:6800 \
   -p 445:445 \
@@ -60,7 +60,7 @@ docker run -d \
   -e SMB_USER=customuser \
   -e SMB_PASSWORD=secretshare \
   --restart unless-stopped \
-  illusion1208/aria2-zero-ariazero:latest
+  illusion1208/ariazero:latest
 ```
 
 ---
