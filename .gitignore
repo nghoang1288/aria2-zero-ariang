@@ -1,0 +1,5 @@
+setup_repo.ps1
+*test*
+.idea/
+.vscode/
+*.zip
