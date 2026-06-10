@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 
 export interface Aria2File {
   path: string;
@@ -20,6 +20,8 @@ export interface Aria2Task {
       name?: string;
     };
   };
+  connections?: string;
+  numSeeders?: string;
 }
 
 export interface Aria2GlobalStat {
@@ -100,6 +102,11 @@ declare global {
   }
 }
 
+// Wait for config.js to load (it is injected dynamically)
+function getRpcSecret(): string {
+  return window.AriaZeroServerConfig?.rpcSecret || '';
+}
+
 export function useAria2() {
   const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
   const [globalStat, setGlobalStat] = useState<Aria2GlobalStat>({
@@ -112,22 +119,96 @@ export function useAria2() {
   const [activeTasks, setActiveTasks] = useState<Aria2Task[]>([]);
   const [waitingTasks, setWaitingTasks] = useState<Aria2Task[]>([]);
   const [stoppedTasks, setStoppedTasks] = useState<Aria2Task[]>([]);
+  const [globalOptions, setGlobalOptions] = useState<Record<string, string>>({});
 
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
   const pollIntervalRef = useRef<number | null>(null);
 
-  // Retrieve secret from injected config
-  const rpcSecret = window.AriaZeroServerConfig ? window.AriaZeroServerConfig.rpcSecret : '';
+  // Use refs for callbacks to avoid stale closures in setInterval
+  const sendRpcRef = useRef<(method: string, params: any[], id: string) => void>(() => {});
+  const sendBatchRpcRef = useRef<(requests: { method: string; params?: any[]; id: string }[]) => void>(() => {});
 
-  useEffect(() => {
-    connect();
-    return () => {
-      cleanup();
-    };
+  // Always read rpcSecret fresh to avoid stale closure from async config.js load
+  const sendRpc = useCallback((method: string, params: any[] = [], id: string) => {
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+      const secret = getRpcSecret();
+      const payload = {
+        jsonrpc: '2.0',
+        id,
+        method,
+        params: secret ? [`token:${secret}`, ...params] : params
+      };
+      socketRef.current.send(JSON.stringify(payload));
+    }
   }, []);
 
-  const cleanup = () => {
+  const sendBatchRpc = useCallback((requests: { method: string; params?: any[]; id: string }[]) => {
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+      const secret = getRpcSecret();
+      const payload = requests.map(r => ({
+        jsonrpc: '2.0',
+        id: r.id,
+        method: r.method,
+        params: secret ? [`token:${secret}`, ...(r.params || [])] : (r.params || [])
+      }));
+      socketRef.current.send(JSON.stringify(payload));
+    }
+  }, []);
+
+  // Keep refs updated
+  sendRpcRef.current = sendRpc;
+  sendBatchRpcRef.current = sendBatchRpc;
+
+  const poll = useCallback(() => {
+    sendBatchRpcRef.current([
+      { method: 'aria2.getGlobalStat', id: 'globalStat' },
+      { method: 'aria2.tellActive', id: 'active' },
+      { method: 'aria2.tellWaiting', params: [0, 1000], id: 'waiting' },
+      { method: 'aria2.tellStopped', params: [0, 1000], id: 'stopped' }
+    ]);
+  }, []);
+
+  const fetchGlobalOptions = useCallback(() => {
+    sendRpcRef.current('aria2.getGlobalOption', [], 'getGlobalOption');
+  }, []);
+
+  const updateGlobalOptions = useCallback((options: Record<string, string>) => {
+    sendRpcRef.current('aria2.changeGlobalOption', [options], 'changeGlobalOption');
+    // Refresh options after a short delay
+    setTimeout(() => sendRpcRef.current('aria2.getGlobalOption', [], 'getGlobalOption'), 500);
+  }, []);
+
+  const handleSingleResponse = useCallback((res: any) => {
+    if (res.error) {
+      console.error('RPC Error:', res.error);
+      return;
+    }
+    const id = res.id;
+    const result = res.result;
+
+    if (id === 'globalStat') {
+      setGlobalStat(result);
+    } else if (id === 'active') {
+      setActiveTasks(result || []);
+    } else if (id === 'waiting') {
+      setWaitingTasks(result || []);
+    } else if (id === 'stopped') {
+      setStoppedTasks(result || []);
+    } else if (id === 'getGlobalOption') {
+      setGlobalOptions(result || {});
+    }
+  }, []);
+
+  const handleRpcMessage = useCallback((message: any) => {
+    if (Array.isArray(message)) {
+      message.forEach(res => handleSingleResponse(res));
+    } else {
+      handleSingleResponse(message);
+    }
+  }, [handleSingleResponse]);
+
+  const cleanup = useCallback(() => {
     if (socketRef.current) {
       socketRef.current.close();
       socketRef.current = null;
@@ -140,9 +221,9 @@ export function useAria2() {
       clearInterval(pollIntervalRef.current);
       pollIntervalRef.current = null;
     }
-  };
+  }, []);
 
-  const connect = () => {
+  const connect = useCallback(() => {
     cleanup();
     setStatus('connecting');
 
@@ -160,15 +241,35 @@ export function useAria2() {
 
       socket.onopen = () => {
         setStatus('connected');
-        // Start polling immediately
-        poll();
-        pollIntervalRef.current = setInterval(poll, 1000) as unknown as number;
+        // Start polling immediately using refs (avoids stale closures)
+        sendBatchRpcRef.current([
+          { method: 'aria2.getGlobalStat', id: 'globalStat' },
+          { method: 'aria2.tellActive', id: 'active' },
+          { method: 'aria2.tellWaiting', params: [0, 1000], id: 'waiting' },
+          { method: 'aria2.tellStopped', params: [0, 1000], id: 'stopped' }
+        ]);
+        sendRpcRef.current('aria2.getGlobalOption', [], 'getGlobalOption');
+        // Use ref-based poll for interval to always get fresh rpcSecret
+        pollIntervalRef.current = setInterval(() => {
+          sendBatchRpcRef.current([
+            { method: 'aria2.getGlobalStat', id: 'globalStat' },
+            { method: 'aria2.tellActive', id: 'active' },
+            { method: 'aria2.tellWaiting', params: [0, 1000], id: 'waiting' },
+            { method: 'aria2.tellStopped', params: [0, 1000], id: 'stopped' }
+          ]);
+        }, 1000) as unknown as number;
       };
 
       socket.onmessage = (event) => {
         try {
           const res = JSON.parse(event.data);
-          handleRpcMessage(res);
+          // Handle both batch and single responses, and aria2 notifications
+          if (Array.isArray(res)) {
+            res.forEach(r => handleSingleResponse(r));
+          } else if (res.id) {
+            handleSingleResponse(res);
+          }
+          // else: aria2 notification (onDownloadStart etc.) - ignore
         } catch (e) {
           console.error('Failed to parse RPC response:', e);
         }
@@ -176,7 +277,11 @@ export function useAria2() {
 
       socket.onclose = () => {
         setStatus('disconnected');
-        reconnectTimeoutRef.current = setTimeout(connect, 3000) as unknown as number;
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+        }
+        reconnectTimeoutRef.current = setTimeout(() => connect(), 3000) as unknown as number;
       };
 
       socket.onerror = (e) => {
@@ -186,95 +291,42 @@ export function useAria2() {
     } catch (e) {
       console.error('Failed to initiate WebSocket:', e);
       setStatus('disconnected');
-      reconnectTimeoutRef.current = setTimeout(connect, 3000) as unknown as number;
+      reconnectTimeoutRef.current = setTimeout(() => connect(), 3000) as unknown as number;
     }
-  };
+  }, [cleanup, handleSingleResponse]);
 
-  const sendRpc = (method: string, params: any[] = [], id: string) => {
-    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-      const payload = {
-        jsonrpc: '2.0',
-        id,
-        method,
-        params: rpcSecret ? [`token:${rpcSecret}`, ...params] : params
-      };
-      socketRef.current.send(JSON.stringify(payload));
-    }
-  };
-
-  const sendBatchRpc = (requests: { method: string; params?: any[]; id: string }[]) => {
-    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-      const payload = requests.map(r => ({
-        jsonrpc: '2.0',
-        id: r.id,
-        method: r.method,
-        params: rpcSecret ? [`token:${rpcSecret}`, ...(r.params || [])] : (r.params || [])
-      }));
-      socketRef.current.send(JSON.stringify(payload));
-    }
-  };
-
-  const poll = () => {
-    sendBatchRpc([
-      { method: 'aria2.getGlobalStat', id: 'globalStat' },
-      { method: 'aria2.tellActive', id: 'active' },
-      { method: 'aria2.tellWaiting', params: [0, 1000], id: 'waiting' },
-      { method: 'aria2.tellStopped', params: [0, 1000], id: 'stopped' }
-    ]);
-  };
-
-  const handleRpcMessage = (message: any) => {
-    if (Array.isArray(message)) {
-      // Handle batch responses
-      message.forEach(res => handleSingleResponse(res));
-    } else {
-      handleSingleResponse(message);
-    }
-  };
-
-  const handleSingleResponse = (res: any) => {
-    if (res.error) {
-      console.error('RPC Error:', res.error);
-      return;
-    }
-    const id = res.id;
-    const result = res.result;
-
-    if (id === 'globalStat') {
-      setGlobalStat(result);
-    } else if (id === 'active') {
-      setActiveTasks(result || []);
-    } else if (id === 'waiting') {
-      setWaitingTasks(result || []);
-    } else if (id === 'stopped') {
-      setStoppedTasks(result || []);
-    }
-  };
+  useEffect(() => {
+    connect();
+    return () => {
+      cleanup();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // User Actions
-  const addUri = (uri: string) => {
-    sendRpc('aria2.addUri', [[uri]], 'addUri');
-  };
+  const addUri = useCallback((uri: string) => {
+    sendRpcRef.current('aria2.addUri', [[uri]], 'addUri');
+  }, []);
 
-  const pauseTask = (gid: string) => {
-    sendRpc('aria2.pause', [gid], 'pause');
-  };
+  const pauseTask = useCallback((gid: string) => {
+    sendRpcRef.current('aria2.pause', [gid], 'pause');
+  }, []);
 
-  const resumeTask = (gid: string) => {
-    sendRpc('aria2.unpause', [gid], 'unpause');
-  };
+  const resumeTask = useCallback((gid: string) => {
+    sendRpcRef.current('aria2.unpause', [gid], 'unpause');
+  }, []);
 
-  const removeTask = (gid: string, status: string) => {
+  const removeTask = useCallback((gid: string, status: string) => {
     if (status === 'active' || status === 'waiting' || status === 'paused') {
-      sendRpc('aria2.forceRemove', [gid], 'remove');
+      sendRpcRef.current('aria2.forceRemove', [gid], 'remove');
     } else {
-      sendRpc('aria2.removeDownloadResult', [gid], 'removeResult');
+      sendRpcRef.current('aria2.removeDownloadResult', [gid], 'removeResult');
     }
-  };
+  }, []);
 
-  const clearStopped = () => {
-    sendRpc('aria2.purgeDownloadResult', [], 'purge');
-  };
+  const clearStopped = useCallback(() => {
+    sendRpcRef.current('aria2.purgeDownloadResult', [], 'purge');
+  }, []);
 
   return {
     status,
@@ -282,10 +334,13 @@ export function useAria2() {
     activeTasks,
     waitingTasks,
     stoppedTasks,
+    globalOptions,
     addUri,
     pauseTask,
     resumeTask,
     removeTask,
-    clearStopped
+    clearStopped,
+    fetchGlobalOptions,
+    updateGlobalOptions
   };
 }

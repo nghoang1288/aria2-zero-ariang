@@ -9,9 +9,7 @@ import {
   Pause, 
   Plus, 
   Search, 
-  Server, 
   Settings, 
-  Folder, 
   Activity, 
   Check, 
   AlertCircle,
@@ -25,6 +23,7 @@ import {
   formatETA 
 } from './useAria2';
 import type { Aria2Task } from './useAria2';
+import SettingsPanel from './SettingsPanel';
 
 function App() {
   const {
@@ -33,11 +32,14 @@ function App() {
     activeTasks,
     waitingTasks,
     stoppedTasks,
+    globalOptions,
     addUri,
     pauseTask,
     resumeTask,
     removeTask,
-    clearStopped
+    clearStopped,
+    fetchGlobalOptions,
+    updateGlobalOptions
   } = useAria2();
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'downloads' | 'settings'>('dashboard');
@@ -342,59 +344,12 @@ function App() {
           )}
 
           {activeTab === 'settings' && (
-            <div className="bg-[#151926] border border-[#1e293b] rounded-xl p-6 max-w-2xl space-y-6">
-              <h2 className="text-md font-semibold text-slate-200 border-b border-[#1e293b] pb-3 flex items-center gap-2">
-                <Server className="w-4 h-4 text-cyan-400" />
-                Connection Information
-              </h2>
-              
-              <div className="grid grid-cols-2 gap-6 text-sm">
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1.5">Aria2 server host</label>
-                  <div className="bg-[#0e111b] border border-[#1e293b] rounded-lg px-4 py-2 text-slate-300 font-mono">
-                    {location.hostname}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1.5">Aria2 server port</label>
-                  <div className="bg-[#0e111b] border border-[#1e293b] rounded-lg px-4 py-2 text-slate-300 font-mono">
-                    {location.port || (location.protocol === 'https:' ? '443' : '80')}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1.5">Protocol</label>
-                  <div className="bg-[#0e111b] border border-[#1e293b] rounded-lg px-4 py-2 text-slate-300 font-mono">
-                    {location.protocol === 'https:' ? 'wss' : 'ws'}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1.5">RPC path</label>
-                  <div className="bg-[#0e111b] border border-[#1e293b] rounded-lg px-4 py-2 text-slate-300 font-mono">
-                    /jsonrpc
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t border-[#1e293b] pt-6 space-y-4">
-                <h3 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
-                  <Folder className="w-4 h-4 text-emerald-400" />
-                  Storage & Downloads
-                </h3>
-                
-                <div className="text-xs text-slate-400 space-y-2">
-                  <p>All downloads are saved inside the container at: <code className="bg-[#0e111b] text-slate-300 px-1.5 py-0.5 rounded border border-[#1e293b]">/downloads</code></p>
-                  <p>This folder is mapped to the host machine and shared via Samba (SMB):</p>
-                  <div className="bg-[#0e111b] border border-[#1e293b] p-3 rounded-lg font-mono text-[11px] text-slate-300 space-y-1">
-                    <div>SMB path: \\192.168.50.226\downloads</div>
-                    <div>User: admin</div>
-                    <div>Password: 123456</div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <SettingsPanel
+              globalOptions={globalOptions}
+              updateGlobalOptions={updateGlobalOptions}
+              fetchGlobalOptions={fetchGlobalOptions}
+              connectionStatus={status}
+            />
           )}
 
         </div>
