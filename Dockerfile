@@ -45,14 +45,15 @@ RUN chmod +x /usr/local/bin/aria2c
 RUN rm -rf /var/www/html/*
 COPY --from=builder /tmp/ariang/ /var/www/html/
 COPY custom.css /var/www/html/custom.css
+COPY apply_settings.js /var/www/html/apply_settings.js
 
 # Pre-configure AriaNg to dynamically connect to the current host and port via WebSockets
 RUN sed -i 's/rpcHost:""/rpcHost:location.hostname/g' /var/www/html/js/aria-ng-*.js && \
     sed -i 's/rpcPort:"6800"/rpcPort:(location.port?location.port:(location.protocol==="https:"?"443":"80"))/g' /var/www/html/js/aria-ng-*.js && \
     sed -i 's/protocol:"http"/protocol:(location.protocol==="https:"?"wss":"ws")/g' /var/www/html/js/aria-ng-*.js
 
-# Inject custom modern stylesheet into index.html
-RUN sed -i 's|</head>|<link rel="stylesheet" href="custom.css"></head>|g' /var/www/html/index.html
+# Inject dynamic setting config script and custom stylesheet into index.html
+RUN sed -i 's|</head>|<script src="config.js"></script><script src="apply_settings.js"></script><link rel="stylesheet" href="custom.css"></head>|g' /var/www/html/index.html
 
 # Copy configurations
 COPY nginx.conf /etc/nginx/sites-available/default

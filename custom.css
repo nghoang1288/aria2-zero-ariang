@@ -336,3 +336,225 @@ body, .wrapper, .content-wrapper {
     border-bottom: 2px solid #3b82f6 !important;
     font-weight: 600;
 }
+
+/* -------------------------------------------------------------
+   AdminLTE Dark Theme & Glassmorphism Patch
+   Fixes all white-on-white text issues in boxes, modals, dropdowns, etc.
+   ------------------------------------------------------------- */
+
+/* Card boxes & content panels */
+.box, .box-header, .box-body, .box-footer {
+    background-color: var(--card-bg) !important;
+    color: #cbd5e1 !important;
+    border-color: var(--glass-border) !important;
+    border-top: none !important;
+}
+
+.box-header .box-title {
+    color: #f8fafc !important;
+    font-weight: 600 !important;
+}
+
+/* Info Boxes */
+.info-box {
+    background-color: var(--card-bg) !important;
+    color: #cbd5e1 !important;
+    border: 1px solid var(--glass-border) !important;
+}
+
+.info-box-text {
+    color: #94a3b8 !important;
+}
+
+.info-box-number {
+    color: #f8fafc !important;
+}
+
+/* Tab Panels Settings */
+.nav-tabs-custom {
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.nav-tabs-custom > .tab-content {
+    background: var(--card-bg) !important;
+    border: 1px solid var(--glass-border) !important;
+    border-top: none !important;
+    color: #cbd5e1 !important;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+}
+
+.nav-tabs-custom > .nav-tabs {
+    border-bottom-color: var(--glass-border) !important;
+    background: rgba(13, 20, 35, 0.4) !important;
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+    padding: 6px 6px 0 6px;
+}
+
+/* Dropdowns & Popovers */
+.dropdown-menu {
+    background-color: #0d1423 !important;
+    border: 1px solid var(--glass-border) !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4) !important;
+}
+
+.dropdown-menu > li > a {
+    color: #cbd5e1 !important;
+    padding: 10px 20px !important;
+    transition: all 0.2s ease;
+}
+
+.dropdown-menu > li > a:hover {
+    background-color: var(--hover-bg) !important;
+    color: #ffffff !important;
+}
+
+.dropdown-menu .divider {
+    background-color: var(--glass-border) !important;
+}
+
+.popover {
+    background-color: #0f172a !important;
+    border: 1px solid var(--glass-border) !important;
+    color: #cbd5e1 !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3) !important;
+}
+
+.popover-title {
+    background-color: rgba(15, 23, 42, 0.4) !important;
+    border-bottom: 1px solid var(--glass-border) !important;
+    color: #f8fafc !important;
+    font-weight: 600;
+}
+
+.popover.top > .arrow::after { border-top-color: #0f172a !important; }
+.popover.right > .arrow::after { border-right-color: #0f172a !important; }
+.popover.bottom > .arrow::after { border-bottom-color: #0f172a !important; }
+.popover.left > .arrow::after { border-left-color: #0f172a !important; }
+
+/* Modals */
+.modal-content {
+    background-color: #0f172a !important;
+    border: 1px solid var(--glass-border) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+    color: #cbd5e1 !important;
+}
+
+.modal-header {
+    border-bottom: 1px solid var(--glass-border) !important;
+    padding: 20px 24px !important;
+}
+
+.modal-body {
+    padding: 24px !important;
+}
+
+.modal-footer {
+    border-top: 1px solid var(--glass-border) !important;
+    padding: 16px 24px !important;
+    background-color: rgba(15, 23, 42, 0.4) !important;
+    border-bottom-left-radius: 16px;
+    border-bottom-right-radius: 16px;
+}
+
+.modal-title {
+    color: #f8fafc !important;
+    font-weight: 600 !important;
+}
+
+.close {
+    color: #94a3b8 !important;
+    text-shadow: none !important;
+    opacity: 0.8 !important;
+    transition: all 0.2s ease;
+}
+
+.close:hover {
+    color: #f1f5f9 !important;
+    opacity: 1 !important;
+}
+
+/* Forms & inputs */
+label, .control-label, .setting-key, .form-group label {
+    color: #94a3b8 !important;
+    font-weight: 500 !important;
+}
+
+.text-muted, .help-block {
+    color: #64748b !important;
+}
+
+input, select, textarea, .form-control {
+    background-color: rgba(15, 23, 42, 0.6) !important;
+    border: 1px solid var(--glass-border) !important;
+    color: #f8fafc !important;
+}
+
+.input-group-addon {
+    background-color: rgba(30, 41, 59, 0.8) !important;
+    border: 1px solid var(--glass-border) !important;
+    color: #cbd5e1 !important;
+}
+
+/* Table elements */
+.table-striped > tbody > tr:nth-of-type(odd) {
+    background-color: rgba(255, 255, 255, 0.015) !important;
+}
+
+.table-hover > tbody > tr:hover {
+    background-color: rgba(255, 255, 255, 0.04) !important;
+}
+
+.table > thead > tr > th {
+    color: #64748b !important;
+}
+
+/* List Groups */
+.list-group-item {
+    background-color: var(--card-bg) !important;
+    border: 1px solid var(--glass-border) !important;
+    color: #cbd5e1 !important;
+}
+
+.list-group-item:hover {
+    background-color: var(--hover-bg) !important;
+}
+
+.list-group-item.active, .list-group-item.active:hover, .list-group-item.active:focus {
+    background: var(--primary-grad) !important;
+    border-color: var(--glass-border) !important;
+    color: #ffffff !important;
+}
+
+/* Callouts & Alerts */
+.callout {
+    border-radius: 8px !important;
+    border-left-width: 4px !important;
+}
+
+.callout.callout-info, .alert-info {
+    background-color: rgba(59, 130, 246, 0.15) !important;
+    border-left-color: #3b82f6 !important;
+    color: #93c5fd !important;
+}
+
+.callout.callout-warning, .alert-warning {
+    background-color: rgba(245, 158, 11, 0.15) !important;
+    border-left-color: #f59e0b !important;
+    color: #fde047 !important;
+}
+
+.callout.callout-danger, .alert-danger {
+    background-color: rgba(239, 68, 68, 0.15) !important;
+    border-left-color: #ef4444 !important;
+    color: #fca5a5 !important;
+}
+
+.callout.callout-success, .alert-success {
+    background-color: rgba(16, 185, 129, 0.15) !important;
+    border-left-color: #10b981 !important;
+    color: #6ee7b7 !important;
+}

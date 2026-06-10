@@ -41,6 +41,13 @@ fi
 # Ensure permissions on configuration and downloads folders
 chmod -R 777 "$DOWNLOAD_DIR" "$CONF_DIR"
 
+# Generate config.js for AriaNg containing the RPC Secret from environment variables
+cat <<EOF > /var/www/html/config.js
+window.AriaNgServerConfig = {
+  rpcSecret: "${ARIA2_RPC_SECRET}"
+};
+EOF
+
 # Set up Samba configuration
 SMB_CONF="/etc/samba/smb.conf"
 
@@ -54,6 +61,8 @@ cat <<EOF > "$SMB_CONF"
    security = user
    create mask = 0777
    directory mask = 0777
+   force create mode = 0777
+   force directory mode = 0777
    force user = root
    force group = root
    load printers = no
