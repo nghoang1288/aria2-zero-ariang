@@ -592,7 +592,6 @@ function AppContent({
 
   const allTasks = [...allActiveAndWaiting, ...stoppedTasks].filter((t: Aria2Task) => !isMetadataTask(t));
   const activeCount = allActiveAndWaiting.filter((t: Aria2Task) => t.status === 'active' && !isTorrentCompleted(t) && !isMetadataTask(t)).length;
-  const downloadsCount = allActiveAndWaiting.filter((t: Aria2Task) => !isTorrentCompleted(t) && !isMetadataTask(t)).length;
   const completedCount = stoppedTasks.filter((t: Aria2Task) => t.status === 'complete' && !isMetadataTask(t)).length + allActiveAndWaiting.filter((t: Aria2Task) => isTorrentCompleted(t) && !isMetadataTask(t)).length;
   const torrentCount = allTasks.filter(isTorrent).length;
   const videoCount = allTasks.filter(isVideo).length;
@@ -696,9 +695,9 @@ function AppContent({
           >
             <ArrowDown className="w-4 h-4" />
             Downloads
-            {downloadsCount > 0 && (
+            {activeCount > 0 && (
               <span className="ml-auto bg-cyan-500/15 text-cyan-400 border border-cyan-500/20 text-xs px-2 py-0.5 rounded-full">
-                {downloadsCount}
+                {activeCount}
               </span>
             )}
           </button>
