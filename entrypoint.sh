@@ -39,6 +39,14 @@ if [ -n "$ARIA2_RPC_SECRET" ]; then
     echo "rpc-secret=$ARIA2_RPC_SECRET" >> "$CONF_FILE"
 fi
 
+# Ensure force-save=true is set to preserve completed tasks across restarts
+if ! grep -q "^force-save=" "$CONF_FILE"; then
+    echo "force-save=true" >> "$CONF_FILE"
+else
+    sed -i 's/^force-save=.*/force-save=true/' "$CONF_FILE"
+fi
+
+
 # Ensure permissions on configuration and downloads folders
 chmod -R 777 "$DOWNLOAD_DIR" "$CONF_DIR"
 
