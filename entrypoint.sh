@@ -28,6 +28,8 @@ min-split-size=10M
 split=16
 max-concurrent-downloads=5
 allow-overwrite=true
+force-save=true
+check-integrity=true
 EOF
 fi
 
@@ -45,6 +47,14 @@ if ! grep -q "^force-save=" "$CONF_FILE"; then
 else
     sed -i 's/^force-save=.*/force-save=true/' "$CONF_FILE"
 fi
+
+# Ensure check-integrity=true is set to verify existing files and allow proper resumes
+if ! grep -q "^check-integrity=" "$CONF_FILE"; then
+    echo "check-integrity=true" >> "$CONF_FILE"
+else
+    sed -i 's/^check-integrity=.*/check-integrity=true/' "$CONF_FILE"
+fi
+
 
 
 # Ensure permissions on configuration and downloads folders
