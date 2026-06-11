@@ -574,9 +574,18 @@ function AppContent({
       Number(task.completedLength) >= Number(task.totalLength);
   };
 
-  const allTasks = [...allActiveAndWaiting, ...stoppedTasks];
-  const activeCount = allActiveAndWaiting.filter((t: Aria2Task) => t.status === 'active' && !isTaskSeeding(t)).length;
-  const completedCount = stoppedTasks.filter((t: Aria2Task) => t.status === 'complete').length + allActiveAndWaiting.filter(isTaskSeeding).length;
+  // Identify completed metadata tasks to hide them
+  const isMetadataTask = (task: Aria2Task) => {
+    const name = getTaskName(task).toLowerCase();
+    return name.includes('[metadata]') || 
+           name.includes('metadata') ||
+           (task as any).followedBy !== undefined ||
+           (!!task.bittorrent && !task.bittorrent.info);
+  };
+
+  const allTasks = [...allActiveAndWaiting, ...stoppedTasks].filter((t: Aria2Task) => !isMetadataTask(t));
+  const activeCount = allActiveAndWaiting.filter((t: Aria2Task) => t.status === 'active' && !isTaskSeeding(t) && !isMetadataTask(t)).length;
+  const completedCount = stoppedTasks.filter((t: Aria2Task) => t.status === 'complete' && !isMetadataTask(t)).length + allActiveAndWaiting.filter((t: Aria2Task) => isTaskSeeding(t) && !isMetadataTask(t)).length;
   const torrentCount = allTasks.filter(isTorrent).length;
   const videoCount = allTasks.filter(isVideo).length;
   const audioCount = allTasks.filter(isAudio).length;
@@ -597,27 +606,30 @@ function AppContent({
   const filterTaskByCategory = (task: Aria2Task) => {
     switch (selectedCategory) {
       case 'active':
-        return (task.status === 'active' || task.status === 'waiting') && !isTaskSeeding(task);
+        return (task.status === 'active' || task.status === 'waiting') && !isTaskSeeding(task) && !isMetadataTask(task);
       case 'completed':
-        return task.status === 'complete' || isTaskSeeding(task);
+        return (task.status === 'complete' || isTaskSeeding(task)) && !isMetadataTask(task);
       case 'torrents':
-        return isTorrent(task);
+        return isTorrent(task) && !isMetadataTask(task);
       case 'video':
-        return isVideo(task);
+        return isVideo(task) && !isMetadataTask(task);
       case 'audio':
-        return isAudio(task);
+        return isAudio(task) && !isMetadataTask(task);
       case 'documents':
-        return isDoc(task);
+        return isDoc(task) && !isMetadataTask(task);
       case 'software':
-        return isSoftware(task);
+        return isSoftware(task) && !isMetadataTask(task);
       case 'all':
       default:
-        return true;
+        return !isMetadataTask(task);
     }
   };
 
-  const downloads = displayDownloads.filter((t: Aria2Task) => !isTaskSeeding(t));
-  const completedAndStopped = [...displayStopped, ...displayDownloads.filter(isTaskSeeding)];
+  const downloads = displayDownloads.filter((t: Aria2Task) => !isTaskSeeding(t) && !isMetadataTask(t));
+  const completedAndStopped = [
+    ...displayStopped.filter((t: Aria2Task) => !isMetadataTask(t)), 
+    ...displayDownloads.filter((t: Aria2Task) => isTaskSeeding(t) && !isMetadataTask(t))
+  ];
 
   const filteredDownloads = downloads.filter(filterTaskByCategory);
   const filteredStopped = completedAndStopped.filter(filterTaskByCategory);
