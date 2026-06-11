@@ -45,6 +45,8 @@ try:
         "-p 16980:80 "
         "-p 16800:6800 "
         "-p 445:445 "
+        "-p 6881:6881 "
+        "-p 6881:6881/udp "
         "-v /home/illusion88/aria2/config:/config "
         "-v /home/illusion88/aria2/downloads:/downloads "
         "-e ARIA2_RPC_SECRET=armageddon "
