@@ -27,7 +27,7 @@ const SmartDownloadContext = createContext<SmartDownloadContextValue>({
 // ---------------------------------------------------------------------------
 
 const DOWNLOADABLE_URL_RE =
-  /(https?:\/\/[^\s]+\.(zip|rar|7z|tar|gz|bz2|xz|iso|exe|msi|dmg|pkg|deb|rpm|apk|mp4|mkv|avi|mov|mp3|flac|wav|pdf|epub|torrent)|magnet:\?xt=urn:[^\s]+|https?:\/\/[^\s]+)/gi;
+  /(https?:\/\/[^\s]+\.(zip|rar|7z|tar|gz|bz2|xz|iso|exe|msi|dmg|pkg|deb|rpm|apk|mp4|mkv|avi|mov|mp3|flac|wav|pdf|epub|torrent)([?#][^\s]*)?|magnet:\?xt=urn:[^\s]+)/gi;
 
 // ---------------------------------------------------------------------------
 // Helpers

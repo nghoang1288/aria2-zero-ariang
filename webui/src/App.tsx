@@ -23,7 +23,8 @@ import {
   Music,
   FileText,
   Box,
-  Upload
+  Upload,
+  Menu
 } from 'lucide-react';
 import { 
   useAria2, 
@@ -322,6 +323,7 @@ function AppContent({
 }: any) {
   const { isDragging } = useSmartDownload();
   const [drawerTab, setDrawerTab] = useState<'files' | 'peers' | 'trackers'>('files');
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
 
   // Helper category detection
   const getFileExtension = (task: Aria2Task): string => {
@@ -383,6 +385,128 @@ function AppContent({
 
   const selectedTask = [...allActiveAndWaiting, ...stoppedTasks].find(t => t.gid === selectedGid);
 
+  const renderSidebarContent = (isMobile = false) => {
+    return (
+      <>
+        <div className="p-5 border-b border-border-main flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="bg-cyan-500/15 p-1.5 rounded-lg border border-cyan-500/30">
+              <Activity className="w-5 h-5 text-cyan-400" />
+            </div>
+            <span className="text-xl font-bold tracking-tight bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
+              AriaZero
+            </span>
+          </div>
+          {isMobile && (
+            <button 
+              onClick={() => setShowMobileSidebar(false)}
+              className="text-text-dim hover:text-text-main p-1 rounded-lg transition-colors md:hidden cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
+        </div>
+        
+        {/* Navigation Tabs */}
+        <nav className="px-4 py-4 space-y-1">
+          <button 
+            onClick={() => {
+              setActiveTab('dashboard');
+              if (isMobile) setShowMobileSidebar(false);
+            }}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer ${
+              activeTab === 'dashboard' 
+                ? 'bg-cyan-500/8 text-cyan-400 border-l-2 border-cyan-400' 
+                : 'text-text-dim hover:bg-page-bg/40 hover:text-text-main border-l-2 border-transparent'
+            }`}
+          >
+            <Activity className="w-4 h-4" />
+            Dashboard
+          </button>
+          
+          <button 
+            onClick={() => {
+              setActiveTab('downloads');
+              if (isMobile) setShowMobileSidebar(false);
+            }}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer ${
+              activeTab === 'downloads' 
+                ? 'bg-cyan-500/8 text-cyan-400 border-l-2 border-cyan-400' 
+                : 'text-text-dim hover:bg-page-bg/40 hover:text-text-main border-l-2 border-transparent'
+            }`}
+          >
+            <ArrowDown className="w-4 h-4" />
+            Downloads
+            {allActiveAndWaiting.length > 0 && (
+              <span className="ml-auto bg-cyan-500/15 text-cyan-400 border border-cyan-500/20 text-xs px-2 py-0.5 rounded-full">
+                {allActiveAndWaiting.length}
+              </span>
+            )}
+          </button>
+          
+          <button 
+            onClick={() => {
+              setActiveTab('settings');
+              if (isMobile) setShowMobileSidebar(false);
+            }}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer ${
+              activeTab === 'settings' 
+                ? 'bg-cyan-500/8 text-cyan-400 border-l-2 border-cyan-400' 
+                : 'text-text-dim hover:bg-page-bg/40 hover:text-text-main border-l-2 border-transparent'
+            }`}
+          >
+            <Settings className="w-4 h-4" />
+            Settings
+          </button>
+        </nav>
+
+        {/* Categories Section */}
+        <div className="px-4 py-2 border-t border-border-main flex-1 overflow-y-auto">
+          <span className="text-[10px] text-text-dim uppercase tracking-wider font-bold block mb-2 px-2">Categories</span>
+          <div className="space-y-1">
+            {categories.map(cat => {
+              const Icon = cat.icon;
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => {
+                    setSelectedCategory(cat.id);
+                    if (isMobile) setShowMobileSidebar(false);
+                  }}
+                  className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                    selectedCategory === cat.id
+                      ? 'bg-cyan-500/10 text-cyan-400 font-semibold'
+                      : 'text-text-dim hover:bg-page-bg/40 hover:text-text-main'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  <span>{cat.label}</span>
+                  {cat.count > 0 && (
+                    <span className="ml-auto text-[9px] bg-border-main border border-border-main/20 text-text-dim px-1.5 py-0.5 rounded-full">
+                      {cat.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Sidebar Footer */}
+        <div className="p-4 border-t border-border-main bg-page-bg/30 shrink-0">
+          <div className="flex items-center justify-between text-xs text-text-dim mb-2">
+            <span>Samba Share</span>
+            <span className="text-emerald-400 font-semibold">Active</span>
+          </div>
+          <div className="text-[11px] text-text-dim font-mono break-all bg-page-bg/60 p-2 rounded border border-border-main">
+            \\192.168.50.226\downloads
+            <div className="mt-1 text-[9px] text-text-dim/80">User: admin | Pass: 123456</div>
+          </div>
+        </div>
+      </>
+    );
+  };
+
   // Form submission handler
   const handleModalSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -413,159 +537,91 @@ function AppContent({
         </div>
       )}
       
-      {/* Sidebar */}
-      <aside className="w-64 bg-sidebar-bg border-r border-border-main flex flex-col shrink-0">
-        <div className="p-5 border-b border-border-main flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="bg-cyan-500/15 p-1.5 rounded-lg border border-cyan-500/30">
-              <Activity className="w-5 h-5 text-cyan-400" />
-            </div>
-            <span className="text-xl font-bold tracking-tight bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
-              AriaZero
-            </span>
-          </div>
-        </div>
-        
-        {/* Navigation Tabs */}
-        <nav className="px-4 py-4 space-y-1">
-          <button 
-            onClick={() => setActiveTab('dashboard')}
-            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-              activeTab === 'dashboard' 
-                ? 'bg-cyan-500/8 text-cyan-400 border-l-2 border-cyan-400' 
-                : 'text-text-dim hover:bg-page-bg/40 hover:text-text-main border-l-2 border-transparent'
-            }`}
-          >
-            <Activity className="w-4 h-4" />
-            Dashboard
-          </button>
-          
-          <button 
-            onClick={() => setActiveTab('downloads')}
-            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-              activeTab === 'downloads' 
-                ? 'bg-cyan-500/8 text-cyan-400 border-l-2 border-cyan-400' 
-                : 'text-text-dim hover:bg-page-bg/40 hover:text-text-main border-l-2 border-transparent'
-            }`}
-          >
-            <ArrowDown className="w-4 h-4" />
-            Downloads
-            {allActiveAndWaiting.length > 0 && (
-              <span className="ml-auto bg-cyan-500/15 text-cyan-400 border border-cyan-500/20 text-xs px-2 py-0.5 rounded-full">
-                {allActiveAndWaiting.length}
-              </span>
-            )}
-          </button>
-          
-          <button 
-            onClick={() => setActiveTab('settings')}
-            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-              activeTab === 'settings' 
-                ? 'bg-cyan-500/8 text-cyan-400 border-l-2 border-cyan-400' 
-                : 'text-text-dim hover:bg-page-bg/40 hover:text-text-main border-l-2 border-transparent'
-            }`}
-          >
-            <Settings className="w-4 h-4" />
-            Settings
-          </button>
-        </nav>
+      {/* Mobile Sidebar backdrop */}
+      {showMobileSidebar && (
+        <div 
+          className="fixed inset-0 bg-slate-950/60 z-[60] md:hidden backdrop-blur-xs transition-opacity duration-300"
+          onClick={() => setShowMobileSidebar(false)}
+        />
+      )}
+      
+      {/* Mobile Sidebar Drawer */}
+      <aside 
+        className={`fixed inset-y-0 left-0 w-64 bg-sidebar-bg border-r border-border-main z-[70] flex flex-col md:hidden transition-transform duration-300 transform ${
+          showMobileSidebar ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        {renderSidebarContent(true)}
+      </aside>
 
-        {/* Categories Section */}
-        <div className="px-4 py-2 border-t border-border-main flex-1 overflow-y-auto">
-          <span className="text-[10px] text-text-dim uppercase tracking-wider font-bold block mb-2 px-2">Categories</span>
-          <div className="space-y-1">
-            {categories.map(cat => {
-              const Icon = cat.icon;
-              return (
-                <button
-                  key={cat.id}
-                  onClick={() => setSelectedCategory(cat.id)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                    selectedCategory === cat.id
-                      ? 'bg-cyan-500/10 text-cyan-400 font-semibold'
-                      : 'text-text-dim hover:bg-page-bg/40 hover:text-text-main'
-                  }`}
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                  <span>{cat.label}</span>
-                  {cat.count > 0 && (
-                    <span className="ml-auto text-[9px] bg-border-main border border-border-main/20 text-text-dim px-1.5 py-0.5 rounded-full">
-                      {cat.count}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Sidebar Footer */}
-        <div className="p-4 border-t border-border-main bg-page-bg/30 shrink-0">
-          <div className="flex items-center justify-between text-xs text-text-dim mb-2">
-            <span>Samba Share</span>
-            <span className="text-emerald-400 font-semibold">Active</span>
-          </div>
-          <div className="text-[11px] text-text-dim font-mono break-all bg-page-bg/60 p-2 rounded border border-border-main">
-            \\192.168.50.226\downloads
-            <div className="mt-1 text-[9px] text-text-dim/80">User: admin | Pass: 123456</div>
-          </div>
-        </div>
+      {/* Desktop Sidebar */}
+      <aside className="hidden md:flex w-64 bg-sidebar-bg border-r border-border-main flex flex-col shrink-0">
+        {renderSidebarContent(false)}
       </aside>
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden relative bg-page-bg">
         
         {/* Top Header */}
-        <header className="h-16 bg-sidebar-bg border-b border-border-main flex items-center justify-between px-8 shrink-0">
-          <div className="flex items-center gap-4">
-            <h1 className="text-lg font-semibold text-text-main capitalize">{activeTab}</h1>
-            {getStatusBadge()}
+        <header className="h-16 bg-sidebar-bg border-b border-border-main flex items-center justify-between px-4 md:px-8 shrink-0">
+          <div className="flex items-center gap-2 md:gap-4">
+            <button
+              onClick={() => setShowMobileSidebar(true)}
+              className="p-1.5 rounded-lg bg-input-bg border border-border-main text-text-dim hover:text-text-main md:hidden transition-colors cursor-pointer"
+              title="Menu"
+            >
+              <Menu className="w-4.5 h-4.5" />
+            </button>
+            <h1 className="text-md md:text-lg font-semibold text-text-main capitalize">{activeTab}</h1>
+            <div className="hidden sm:block">
+              {getStatusBadge()}
+            </div>
             {selectedCategory !== 'all' && (
-              <span className="text-xs bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-2 py-0.5 rounded-full font-medium capitalize">
-                Category: {selectedCategory}
+              <span className="hidden sm:inline-block text-[10px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-2 py-0.5 rounded-full font-medium capitalize">
+                {selectedCategory}
               </span>
             )}
           </div>
           
           {/* Action Buttons, Theme Toggle, & Search */}
-          <div className="flex items-center gap-3">
-            <div className="relative w-64">
-              <Search className="w-4 h-4 text-text-dim absolute left-3 top-2.5" />
+          <div className="flex items-center gap-2 md:gap-3">
+            <div className="relative w-28 sm:w-48 md:w-64">
+              <Search className="w-3.5 h-3.5 text-text-dim absolute left-2.5 top-2.5" />
               <input 
                 type="text" 
-                placeholder="Search downloads..." 
+                placeholder="Search..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-input-bg border border-border-main rounded-lg pl-9 pr-4 py-1.5 text-xs text-text-main placeholder-text-dim/60 focus:outline-none focus:border-cyan-500 transition-colors"
+                className="w-full bg-input-bg border border-border-main rounded-lg pl-8 pr-3 py-1.5 text-[11px] text-text-main placeholder-text-dim/60 focus:outline-none focus:border-cyan-500 transition-colors"
               />
             </div>
 
             {/* Theme Toggle */}
             <button 
               onClick={toggleTheme}
-              className="p-2 rounded-lg bg-input-bg border border-border-main text-text-dim hover:text-text-main transition-colors cursor-pointer"
+              className="p-1.5 md:p-2 rounded-lg bg-input-bg border border-border-main text-text-dim hover:text-text-main transition-colors cursor-pointer"
               title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             >
-              {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400 animate-pulse" /> : <Moon className="w-4 h-4 text-indigo-500" />}
+              {theme === 'dark' ? <Sun className="w-3.5 h-3.5 text-amber-400 animate-pulse" /> : <Moon className="w-3.5 h-3.5 text-indigo-500" />}
             </button>
             
             <button 
               onClick={() => setShowAddModal(true)}
-              className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-medium text-xs px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 shadow-md shadow-cyan-500/10 transition-colors cursor-pointer"
+              className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-medium text-xs px-2.5 py-1.5 sm:px-3.5 sm:py-1.5 rounded-lg flex items-center gap-1.5 shadow-md shadow-cyan-500/10 transition-colors cursor-pointer"
             >
-              <Plus className="w-4 h-4" />
-              New Download
+              <Plus className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">New Download</span>
             </button>
           </div>
         </header>
 
         {/* Page Container */}
-        <div className="flex-1 overflow-y-auto p-8 space-y-8">
+        <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 md:space-y-8">
           
           {activeTab === 'dashboard' && (
             <>
               {/* Stat Grid */}
-              <div className="grid grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
                 <div className="bg-card-bg border border-border-main rounded-xl p-5 flex items-center justify-between">
                   <div>
                     <span className="text-xs text-text-dim font-medium block mb-1">Active Downloads</span>
@@ -642,7 +698,8 @@ function AppContent({
                   </div>
                 ) : (
                   <div className="bg-card-bg border border-border-main rounded-xl overflow-hidden">
-                    <table className="w-full text-left border-collapse">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse min-w-[550px] md:min-w-0">
                       <thead>
                         <tr className="border-b border-border-main bg-page-bg/40 text-text-dim text-[10px] uppercase font-bold tracking-wider">
                           <th className="py-3 px-5">File Name</th>
@@ -696,6 +753,7 @@ function AppContent({
                         })}
                       </tbody>
                     </table>
+                    </div>
                   </div>
                 )}
               </div>
@@ -741,25 +799,25 @@ function AppContent({
         </div>
 
         {/* Global speed indicator at bottom */}
-        <footer className="h-12 bg-sidebar-bg border-t border-border-main flex items-center justify-between px-8 text-xs text-text-dim shrink-0">
+        <footer className="h-12 bg-sidebar-bg border-t border-border-main flex items-center justify-between px-4 md:px-8 text-xs text-text-dim shrink-0">
           <div className="flex items-center gap-3">
             <span>AriaZero v1.2.0</span>
-            <span className="text-[10px] text-text-dim/60 font-mono">Real-time Graphs • Task details drawer • Bandwidth scheduler</span>
+            <span className="hidden lg:inline text-[10px] text-text-dim/60 font-mono">Real-time Graphs • Task details drawer • Bandwidth scheduler</span>
           </div>
           
           {/* Sparklines */}
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center gap-4 md:gap-6">
+            <div className="flex items-center gap-1.5 md:gap-2">
               <ArrowDown className="w-3.5 h-3.5 text-cyan-400" />
               <span>Down: {formatSpeed(globalStat.downloadSpeed)}</span>
-              <div className="ml-1 shrink-0 opacity-80 border border-border-main/40 rounded p-0.5 bg-page-bg/40">
+              <div className="hidden sm:block ml-1 shrink-0 opacity-80 border border-border-main/40 rounded p-0.5 bg-page-bg/40">
                 <Sparkline data={speedHistory?.down || []} color="#22d3ee" />
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 md:gap-2">
               <ArrowUp className="w-3.5 h-3.5 text-emerald-400" />
               <span>Up: {formatSpeed(globalStat.uploadSpeed)}</span>
-              <div className="ml-1 shrink-0 opacity-80 border border-border-main/40 rounded p-0.5 bg-page-bg/40">
+              <div className="hidden sm:block ml-1 shrink-0 opacity-80 border border-border-main/40 rounded p-0.5 bg-page-bg/40">
                 <Sparkline data={speedHistory?.up || []} color="#34d399" />
               </div>
             </div>
@@ -768,7 +826,7 @@ function AppContent({
 
         {/* Sliding Task Details Drawer */}
         {selectedTask && (
-          <div className="absolute inset-y-0 right-0 w-[420px] bg-sidebar-bg border-l border-border-main shadow-2xl z-40 flex flex-col transition-all duration-300 transform translate-x-0">
+          <div className="absolute inset-y-0 right-0 w-full sm:w-[420px] bg-sidebar-bg border-l border-border-main shadow-2xl z-[80] flex flex-col transition-all duration-300 transform translate-x-0">
             {/* Drawer Header */}
             <div className="p-5 border-b border-border-main flex items-center justify-between">
               <div className="min-w-0">
@@ -1117,7 +1175,7 @@ function TaskCard({ task, onPause, onResume, onRemove, onSelect, isSelected }: T
     >
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1.5">
-          <span className="font-semibold text-xs text-text-main truncate block max-w-lg" title={getTaskName(task)}>
+          <span className="font-semibold text-xs text-text-main truncate block max-w-[70vw] sm:max-w-lg" title={getTaskName(task)}>
             {getTaskName(task)}
           </span>
           <span className="text-[10px] text-text-dim font-mono">
@@ -1162,7 +1220,7 @@ function TaskCard({ task, onPause, onResume, onRemove, onSelect, isSelected }: T
         )}
 
         {/* Actions */}
-        <div className="flex items-center gap-1.5 border-l border-border-main pl-4">
+        <div className="flex items-center gap-1.5 md:border-l md:border-border-main md:pl-4 pl-0 border-l-0">
           {isActive ? (
             <button 
               onClick={() => onPause(task.gid)}
