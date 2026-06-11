@@ -325,6 +325,212 @@ function AppContent({
   const [drawerTab, setDrawerTab] = useState<'files' | 'peers' | 'trackers'>('files');
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
 
+  const { showToast } = useToast();
+
+  // Disk Space State
+  interface DiskSpaceInfo {
+    total: number;
+    used: number;
+    free: number;
+  }
+  const [diskSpace, setDiskSpace] = useState<DiskSpaceInfo | null>(null);
+
+  // Fetch disk space from `/api/disk`
+  const fetchDiskSpace = useCallback(async () => {
+    try {
+      const devHost = '192.168.50.226';
+      const devPort = '16980';
+      const host = location.port === '5173' ? devHost : location.hostname;
+      const port = location.port === '5173' ? devPort : (location.port || (location.protocol === 'https:' ? '443' : '80'));
+      const protocol = location.protocol === 'https:' ? 'https' : 'http';
+      const url = `${protocol}://${host}:${port}/api/disk`;
+
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        setDiskSpace(data);
+      }
+    } catch (e) {
+      console.error('Failed to fetch disk space:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDiskSpace();
+    const interval = setInterval(fetchDiskSpace, 15000);
+    return () => clearInterval(interval);
+  }, [fetchDiskSpace]);
+
+  // Task Removal States
+  const [taskToRemove, setTaskToRemove] = useState<Aria2Task | null>(null);
+  const [deleteFilesOnDisk, setDeleteFilesOnDisk] = useState(false);
+  const [isDeletingFiles, setIsDeletingFiles] = useState(false);
+
+  // Bulk Clear States
+  const [showClearAllConfirm, setShowClearAllConfirm] = useState(false);
+  const [deleteClearAllFiles, setDeleteClearAllFiles] = useState(false);
+  const [isClearingAll, setIsClearingAll] = useState(false);
+
+  // Helper to resolve paths to delete for a task
+  const getPathsToDelete = useCallback((task: Aria2Task): string[] => {
+    if (!task.files || task.files.length === 0) return [];
+    
+    const paths = task.files
+      .map(f => f.path)
+      .filter(p => p && p.startsWith('/downloads/'));
+      
+    if (paths.length === 0) return [];
+    
+    const itemsToDelete = new Set<string>();
+    
+    for (const path of paths) {
+      const relative = path.substring('/downloads/'.length);
+      const firstPart = relative.split(/[/\\]/)[0];
+      if (firstPart) {
+        const topLevelPath = `/downloads/${firstPart}`;
+        itemsToDelete.add(topLevelPath);
+        itemsToDelete.add(`${topLevelPath}.aria2`);
+      }
+    }
+    
+    return Array.from(itemsToDelete);
+  }, []);
+
+  const handleInitiateRemove = (task: Aria2Task) => {
+    setTaskToRemove(task);
+    setDeleteFilesOnDisk(false);
+  };
+
+  const handleConfirmRemove = async () => {
+    if (!taskToRemove) return;
+    
+    setIsDeletingFiles(true);
+    try {
+      if (deleteFilesOnDisk) {
+        const paths = getPathsToDelete(taskToRemove);
+        if (paths.length > 0) {
+          const devHost = '192.168.50.226';
+          const devPort = '16980';
+          const host = location.port === '5173' ? devHost : location.hostname;
+          const port = location.port === '5173' ? devPort : (location.port || (location.protocol === 'https:' ? '443' : '80'));
+          const protocol = location.protocol === 'https:' ? 'https' : 'http';
+          const url = `${protocol}://${host}:${port}/api/delete-files`;
+
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ files: paths })
+          });
+          
+          if (!res.ok) {
+            console.error('Failed to delete files on disk');
+          } else {
+            const data = await res.json();
+            if (data.errors && data.errors.length > 0) {
+              showToast({
+                type: 'warning',
+                title: 'Partial file deletion',
+                message: data.errors.join(', ')
+              });
+            } else {
+              showToast({
+                type: 'success',
+                title: 'Files deleted',
+                message: 'Successfully deleted downloaded files from disk.'
+              });
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error during file deletion:', e);
+      showToast({
+        type: 'error',
+        title: 'Error deleting files',
+        message: 'An error occurred while trying to delete files from disk.'
+      });
+    } finally {
+      removeTask(taskToRemove.gid, taskToRemove.status);
+      setTaskToRemove(null);
+      setIsDeletingFiles(false);
+      setTimeout(fetchDiskSpace, 1000);
+    }
+  };
+
+  const handleConfirmClearAll = async () => {
+    setIsClearingAll(true);
+    try {
+      if (deleteClearAllFiles) {
+        const allPaths: string[] = [];
+        for (const task of stoppedTasks) {
+          allPaths.push(...getPathsToDelete(task));
+        }
+        
+        if (allPaths.length > 0) {
+          const devHost = '192.168.50.226';
+          const devPort = '16980';
+          const host = location.port === '5173' ? devHost : location.hostname;
+          const port = location.port === '5173' ? devPort : (location.port || (location.protocol === 'https:' ? '443' : '80'));
+          const protocol = location.protocol === 'https:' ? 'https' : 'http';
+          const url = `${protocol}://${host}:${port}/api/delete-files`;
+
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ files: allPaths })
+          });
+          
+          if (res.ok) {
+            const data = await res.json();
+            if (data.errors && data.errors.length > 0) {
+              showToast({
+                type: 'warning',
+                title: 'Partial file deletion',
+                message: 'Some files could not be deleted.'
+              });
+            } else {
+              showToast({
+                type: 'success',
+                title: 'Files deleted',
+                message: 'Successfully deleted files for all stopped tasks.'
+              });
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error clearing all files:', e);
+    } finally {
+      clearStopped();
+      setShowClearAllConfirm(false);
+      setIsClearingAll(false);
+      setTimeout(fetchDiskSpace, 1000);
+    }
+  };
+
+  // Retry logic
+  const retryTask = useCallback((task: Aria2Task) => {
+    const url = task.infoHash 
+      ? `magnet:?xt=urn:btih:${task.infoHash}` 
+      : (task.files?.[0]?.uris?.[0]?.uri || null);
+      
+    if (url) {
+      addUri(url);
+      removeTask(task.gid, task.status);
+      showToast({
+        type: 'success',
+        title: 'Retrying Download',
+        message: `Started retrying task: ${getTaskName(task)}`
+      });
+    } else {
+      showToast({
+        type: 'error',
+        title: 'Retry Failed',
+        message: 'Could not retrieve original download link for this task.'
+      });
+    }
+  }, [addUri, removeTask, showToast]);
+
   // Helper category detection
   const getFileExtension = (task: Aria2Task): string => {
     const name = getTaskName(task).toLowerCase();
@@ -338,9 +544,17 @@ function AppContent({
   const isSoftware = (task: Aria2Task) => ['exe', 'msi', 'dmg', 'pkg', 'deb', 'rpm', 'apk', 'zip', 'rar', '7z', 'tar', 'gz'].includes(getFileExtension(task));
   const isTorrent = (task: Aria2Task) => !!task.bittorrent;
 
+  // A task is seeding if it is active, is a torrent, and completedLength >= totalLength
+  const isTaskSeeding = (task: Aria2Task) => {
+    return task.status === 'active' && 
+      !!task.bittorrent && 
+      Number(task.totalLength) > 0 && 
+      Number(task.completedLength) >= Number(task.totalLength);
+  };
+
   const allTasks = [...allActiveAndWaiting, ...stoppedTasks];
-  const activeCount = allActiveAndWaiting.filter((t: Aria2Task) => t.status === 'active').length;
-  const completedCount = stoppedTasks.filter((t: Aria2Task) => t.status === 'complete').length;
+  const activeCount = allActiveAndWaiting.filter((t: Aria2Task) => t.status === 'active' && !isTaskSeeding(t)).length;
+  const completedCount = stoppedTasks.filter((t: Aria2Task) => t.status === 'complete').length + allActiveAndWaiting.filter(isTaskSeeding).length;
   const torrentCount = allTasks.filter(isTorrent).length;
   const videoCount = allTasks.filter(isVideo).length;
   const audioCount = allTasks.filter(isAudio).length;
@@ -361,9 +575,9 @@ function AppContent({
   const filterTaskByCategory = (task: Aria2Task) => {
     switch (selectedCategory) {
       case 'active':
-        return task.status === 'active';
+        return (task.status === 'active' || task.status === 'waiting') && !isTaskSeeding(task);
       case 'completed':
-        return task.status === 'complete';
+        return task.status === 'complete' || isTaskSeeding(task);
       case 'torrents':
         return isTorrent(task);
       case 'video':
@@ -380,8 +594,11 @@ function AppContent({
     }
   };
 
-  const filteredDownloads = displayDownloads.filter(filterTaskByCategory);
-  const filteredStopped = displayStopped.filter(filterTaskByCategory);
+  const downloads = displayDownloads.filter((t: Aria2Task) => !isTaskSeeding(t));
+  const completedAndStopped = [...displayStopped, ...displayDownloads.filter(isTaskSeeding)];
+
+  const filteredDownloads = downloads.filter(filterTaskByCategory);
+  const filteredStopped = completedAndStopped.filter(filterTaskByCategory);
 
   const selectedTask = [...allActiveAndWaiting, ...stoppedTasks].find(t => t.gid === selectedGid);
 
@@ -494,6 +711,29 @@ function AppContent({
 
         {/* Sidebar Footer */}
         <div className="p-4 border-t border-border-main bg-page-bg/30 shrink-0">
+          {diskSpace && (
+            <div className="mb-4">
+              <div className="flex items-center justify-between text-xs text-text-dim mb-1.5">
+                <span className="flex items-center gap-1.5">
+                  <Folder className="w-3.5 h-3.5 text-cyan-400" />
+                  Disk Storage
+                </span>
+                <span className="font-mono text-[10px] text-text-main font-semibold">
+                  {formatBytes(diskSpace.free)} free
+                </span>
+              </div>
+              <div className="bg-page-bg/40 border border-border-main/20 rounded-full h-1.5 overflow-hidden mb-1">
+                <div 
+                  style={{ width: `${Math.round((diskSpace.used / diskSpace.total) * 100)}%` }} 
+                  className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-blue-500"
+                ></div>
+              </div>
+              <div className="flex justify-between text-[9px] text-text-dim/80 font-mono">
+                <span>Used: {formatBytes(diskSpace.used)}</span>
+                <span>Total: {formatBytes(diskSpace.total)}</span>
+              </div>
+            </div>
+          )}
           <div className="flex items-center justify-between text-xs text-text-dim mb-2">
             <span>Samba Share</span>
             <span className="text-emerald-400 font-semibold">Active</span>
@@ -576,6 +816,12 @@ function AppContent({
             <div className="hidden sm:block">
               {getStatusBadge()}
             </div>
+            {diskSpace && (
+              <span className="hidden md:inline-flex items-center gap-1.5 text-[10px] bg-slate-800/40 border border-slate-700/30 text-slate-300 px-2.5 py-1 rounded-full font-mono font-medium">
+                <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                <span>{formatBytes(diskSpace.free)} / {formatBytes(diskSpace.total)} free</span>
+              </span>
+            )}
             {selectedCategory !== 'all' && (
               <span className="hidden sm:inline-block text-[10px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-2 py-0.5 rounded-full font-medium capitalize">
                 {selectedCategory}
@@ -670,7 +916,7 @@ function AppContent({
                         task={task} 
                         onPause={pauseTask} 
                         onResume={resumeTask} 
-                        onRemove={removeTask}
+                        onRemove={handleInitiateRemove}
                         onSelect={setSelectedGid}
                         isSelected={selectedGid === task.gid}
                       />
@@ -685,7 +931,10 @@ function AppContent({
                   <h2 className="text-sm font-semibold tracking-wider uppercase text-text-dim">Recent Completions</h2>
                   {filteredStopped.length > 0 && (
                     <button 
-                      onClick={clearStopped}
+                      onClick={() => {
+                        setShowClearAllConfirm(true);
+                        setDeleteClearAllFiles(false);
+                      }}
                       className="text-xs text-text-dim hover:text-text-main flex items-center gap-1 transition-colors cursor-pointer"
                     >
                       Clear stopped tasks
@@ -711,6 +960,7 @@ function AppContent({
                       <tbody>
                         {filteredStopped.map((task: Aria2Task) => {
                           const isError = task.status === 'error';
+                          const isSeeding = isTaskSeeding(task);
                           return (
                             <tr 
                               key={task.gid} 
@@ -726,11 +976,32 @@ function AppContent({
                                 {getTaskName(task)}
                               </td>
                               <td className="py-3 px-5 text-text-dim">{formatBytes(task.totalLength)}</td>
-                              <td className="py-3 px-5">
+                              <td className="py-3 px-5 relative group/status">
                                 {isError ? (
-                                  <span className="text-rose-400 flex items-center gap-1.5 font-medium">
-                                    <AlertCircle className="w-3.5 h-3.5" />
-                                    Error
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-rose-400 flex items-center gap-1.5 font-medium cursor-help">
+                                      <AlertCircle className="w-3.5 h-3.5" />
+                                      Error
+                                    </span>
+                                    <button 
+                                      onClick={() => retryTask(task)}
+                                      className="px-1.5 py-0.5 text-[9px] bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 rounded-md hover:bg-cyan-500 hover:text-white transition-all cursor-pointer font-medium"
+                                      title="Retry download"
+                                    >
+                                      Retry
+                                    </button>
+                                    
+                                    {/* Tooltip */}
+                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/status:block z-50 bg-slate-900 border border-slate-700 text-slate-100 text-[10px] p-2.5 rounded-lg shadow-xl max-w-xs w-64 pointer-events-none break-words font-mono text-left leading-relaxed">
+                                      <div className="text-rose-400 font-semibold mb-1">Aria2 Error (Code {task.errorCode || 'Unknown'}):</div>
+                                      <div>{task.errorMessage || 'No detailed error message available.'}</div>
+                                      <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
+                                    </div>
+                                  </div>
+                                ) : isSeeding ? (
+                                  <span className="text-emerald-400 flex items-center gap-1.5 font-medium animate-pulse">
+                                    <ArrowUp className="w-3.5 h-3.5" />
+                                    Seeding ({formatSpeed(task.uploadSpeed)})
                                   </span>
                                 ) : (
                                   <span className="text-emerald-400 flex items-center gap-1.5 font-medium">
@@ -741,7 +1012,7 @@ function AppContent({
                               </td>
                               <td className="py-3 px-5 text-right">
                                 <button 
-                                  onClick={() => removeTask(task.gid, task.status)}
+                                  onClick={() => handleInitiateRemove(task)}
                                   className="text-text-dim hover:text-rose-400 p-1.5 rounded transition-colors cursor-pointer"
                                   title="Delete task from history"
                                 >
@@ -777,7 +1048,7 @@ function AppContent({
                       task={task} 
                       onPause={pauseTask} 
                       onResume={resumeTask} 
-                      onRemove={removeTask}
+                      onRemove={handleInitiateRemove}
                       onSelect={setSelectedGid}
                       isSelected={selectedGid === task.gid}
                     />
@@ -873,6 +1144,28 @@ function AppContent({
 
             {/* Drawer Content */}
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              {selectedTask.status === 'error' && (
+                <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-4 text-xs space-y-3 animate-in slide-in-from-top duration-200">
+                  <div className="flex items-start gap-2.5">
+                    <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="font-semibold text-rose-400">Download Error</h4>
+                      <p className="text-text-dim mt-1 font-mono text-[11px] break-words">
+                        Code {selectedTask.errorCode || 'Unknown'}: {selectedTask.errorMessage || 'No details available.'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex justify-end pt-1">
+                    <button 
+                      onClick={() => retryTask(selectedTask)}
+                      className="bg-cyan-500 hover:bg-cyan-600 text-white font-medium text-[11px] px-3 py-1 rounded-lg transition-colors cursor-pointer"
+                    >
+                      Retry Download
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {drawerTab === 'files' && (
                 <div className="space-y-3">
                   {selectedTask.files?.map((file: any, i: number) => {
@@ -1010,6 +1303,163 @@ function AppContent({
         )}
       </main>
 
+      {/* Task Removal Confirmation Modal */}
+      {taskToRemove && (
+        <div className="fixed inset-0 bg-slate-950/65 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-sidebar-bg border border-border-main rounded-xl max-w-md w-full overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="p-5 border-b border-border-main flex items-center justify-between">
+              <h3 className="text-md font-semibold text-text-main flex items-center gap-2">
+                <Trash2 className="w-5 h-5 text-rose-500" />
+                Remove Download
+              </h3>
+              <button 
+                onClick={() => setTaskToRemove(null)}
+                disabled={isDeletingFiles}
+                className="text-text-dim hover:text-text-main p-1 rounded transition-colors cursor-pointer disabled:opacity-50"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-5 space-y-4">
+              <div className="text-xs text-text-dim">
+                Are you sure you want to remove this download task from the list?
+                <div className="mt-2 p-2.5 bg-page-bg/50 border border-border-main/50 rounded-lg text-text-main font-semibold truncate" title={getTaskName(taskToRemove)}>
+                  {getTaskName(taskToRemove)}
+                </div>
+              </div>
+              
+              {getPathsToDelete(taskToRemove).length > 0 && (
+                <div className="bg-page-bg/40 border border-border-main/30 rounded-lg p-3.5 space-y-2.5">
+                  <label className="flex items-start gap-2.5 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={deleteFilesOnDisk}
+                      onChange={(e) => setDeleteFilesOnDisk(e.target.checked)}
+                      disabled={isDeletingFiles}
+                      className="mt-0.5 rounded border-slate-700 text-cyan-500 focus:ring-cyan-500/30 w-4 h-4 cursor-pointer bg-slate-800"
+                    />
+                    <div className="text-xs">
+                      <span className="font-semibold text-text-main">Also delete downloaded files from disk</span>
+                      <p className="text-[10px] text-text-dim mt-0.5">
+                        Permanently removes files inside <code className="bg-slate-800/80 px-1 rounded text-cyan-400">/downloads/</code>
+                      </p>
+                    </div>
+                  </label>
+                  
+                  {deleteFilesOnDisk && (
+                    <div className="text-[10px] text-amber-400 bg-amber-500/5 border border-amber-500/10 rounded p-2 flex items-start gap-1.5 font-medium animate-in slide-in-from-top-1 duration-200">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>Warning: This will permanently delete the downloaded files on your server's storage. This action cannot be undone.</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            <div className="p-5 border-t border-border-main bg-page-bg/25 flex justify-end gap-3">
+              <button 
+                onClick={() => setTaskToRemove(null)}
+                disabled={isDeletingFiles}
+                className="px-3.5 py-2 text-xs font-medium bg-input-bg border border-border-main rounded-lg text-text-dim hover:text-text-main transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleConfirmRemove}
+                disabled={isDeletingFiles}
+                className="px-3.5 py-2 text-xs font-medium bg-rose-500 hover:bg-rose-600 text-white rounded-lg transition-colors flex items-center gap-1.5 shadow-md shadow-rose-500/10 cursor-pointer disabled:opacity-50"
+              >
+                {isDeletingFiles ? (
+                  <>
+                    <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  'Confirm Remove'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Task Bulk Clear Confirmation Modal */}
+      {showClearAllConfirm && (
+        <div className="fixed inset-0 bg-slate-950/65 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-sidebar-bg border border-border-main rounded-xl max-w-md w-full overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="p-5 border-b border-border-main flex items-center justify-between">
+              <h3 className="text-md font-semibold text-text-main flex items-center gap-2">
+                <Trash2 className="w-5 h-5 text-rose-500" />
+                Clear History
+              </h3>
+              <button 
+                onClick={() => setShowClearAllConfirm(false)}
+                disabled={isClearingAll}
+                className="text-text-dim hover:text-text-main p-1 rounded transition-colors cursor-pointer disabled:opacity-50"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-5 space-y-4">
+              <div className="text-xs text-text-dim">
+                Are you sure you want to clear all stopped and completed tasks from history?
+              </div>
+              
+              <div className="bg-page-bg/40 border border-border-main/30 rounded-lg p-3.5 space-y-2.5">
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={deleteClearAllFiles}
+                    onChange={(e) => setDeleteClearAllFiles(e.target.checked)}
+                    disabled={isClearingAll}
+                    className="mt-0.5 rounded border-slate-700 text-cyan-500 focus:ring-cyan-500/30 w-4 h-4 cursor-pointer bg-slate-800"
+                  />
+                  <div className="text-xs">
+                    <span className="font-semibold text-text-main">Also delete files for these tasks from disk</span>
+                    <p className="text-[10px] text-text-dim mt-0.5">
+                      Permanently removes files inside <code className="bg-slate-800/80 px-1 rounded text-cyan-400">/downloads/</code>
+                    </p>
+                  </div>
+                </label>
+                
+                {deleteClearAllFiles && (
+                  <div className="text-[10px] text-amber-400 bg-amber-500/5 border border-amber-500/10 rounded p-2 flex items-start gap-1.5 font-medium animate-in slide-in-from-top-1 duration-200">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>Warning: This will permanently delete files for ALL history tasks. This action cannot be undone.</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <div className="p-5 border-t border-border-main bg-page-bg/25 flex justify-end gap-3">
+              <button 
+                onClick={() => setShowClearAllConfirm(false)}
+                disabled={isClearingAll}
+                className="px-3.5 py-2 text-xs font-medium bg-input-bg border border-border-main rounded-lg text-text-dim hover:text-text-main transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleConfirmClearAll}
+                disabled={isClearingAll}
+                className="px-3.5 py-2 text-xs font-medium bg-rose-500 hover:bg-rose-600 text-white rounded-lg transition-colors flex items-center gap-1.5 shadow-md shadow-rose-500/10 cursor-pointer disabled:opacity-50"
+              >
+                {isClearingAll ? (
+                  <>
+                    <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  'Confirm Clear'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal Add Uri */}
       {showAddModal && (
         <div className="fixed inset-0 bg-slate-950/65 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -1145,7 +1595,7 @@ interface TaskCardProps {
   task: Aria2Task;
   onPause: (gid: string) => void;
   onResume: (gid: string) => void;
-  onRemove: (gid: string, status: string) => void;
+  onRemove: (task: Aria2Task) => void;
   onSelect: (gid: string) => void;
   isSelected: boolean;
 }
@@ -1203,7 +1653,7 @@ function TaskCard({ task, onPause, onResume, onRemove, onSelect, isSelected }: T
           <div className="flex gap-4 text-xs font-mono">
             <div className="text-cyan-400">
               <span className="text-text-dim text-[10px] block uppercase font-medium tracking-wide">Speed</span>
-              {speed}
+              {Number(task.uploadSpeed) > 0 ? `↓ ${speed} | ↑ ${formatSpeed(task.uploadSpeed)}` : speed}
             </div>
             <div className="text-text-main">
               <span className="text-text-dim text-[10px] block uppercase font-medium tracking-wide">ETA</span>
@@ -1240,7 +1690,7 @@ function TaskCard({ task, onPause, onResume, onRemove, onSelect, isSelected }: T
           )}
 
           <button 
-            onClick={() => onRemove(task.gid, task.status)}
+            onClick={() => onRemove(task)}
             className="text-text-dim hover:text-rose-400 p-2 rounded-lg hover:bg-page-bg/40 transition-colors cursor-pointer"
             title="Cancel/Delete download"
           >

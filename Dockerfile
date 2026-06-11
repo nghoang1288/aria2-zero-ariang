@@ -37,6 +37,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     supervisor \
     ca-certificates \
     procps \
+    python3-minimal \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy aria2c binary from builder stage
@@ -50,8 +51,9 @@ COPY --from=webui-builder /webui/dist/ /var/www/html/
 # Copy configurations
 COPY nginx.conf /etc/nginx/sites-available/default
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY disk_space_api.py /usr/local/bin/disk_space_api.py
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/disk_space_api.py
 
 # Expose ports:
 # 80: AriaZero WebUI (Nginx)

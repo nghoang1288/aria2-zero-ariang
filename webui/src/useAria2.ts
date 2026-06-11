@@ -22,6 +22,9 @@ export interface Aria2Task {
   };
   connections?: string;
   numSeeders?: string;
+  errorCode?: string;
+  errorMessage?: string;
+  infoHash?: string;
 }
 
 export interface Aria2GlobalStat {
