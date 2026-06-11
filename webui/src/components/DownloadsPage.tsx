@@ -17,6 +17,8 @@ interface DownloadsPageProps {
   stoppedTasks: Aria2Task[];
   searchQuery: string;
   selectedCategory: string;
+  setSelectedCategory: (category: string) => void;
+  categories: { id: string; label: string; icon: any; count: number }[];
   pauseTask: (gid: string) => void;
   resumeTask: (gid: string) => void;
   handleInitiateRemove: (task: Aria2Task) => void;
@@ -33,6 +35,8 @@ export default function DownloadsPage({
   stoppedTasks,
   searchQuery,
   selectedCategory,
+  categories,
+  setSelectedCategory,
   pauseTask,
   resumeTask,
   handleInitiateRemove,
@@ -77,6 +81,40 @@ export default function DownloadsPage({
 
   return (
     <div className="space-y-8">
+      {/* Category Pills Filters */}
+      <div className="bg-card-bg border border-border-main rounded-xl p-4">
+        <span className="text-[10px] text-text-dim uppercase tracking-wider font-bold block mb-3 px-1">Filter Categories</span>
+        <div className="flex flex-wrap gap-2">
+          {categories.map(cat => {
+            const Icon = cat.icon;
+            const isSelected = selectedCategory === cat.id;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setSelectedCategory(cat.id)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                  isSelected
+                    ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400 font-bold'
+                    : 'bg-page-bg/30 border-border-main text-text-dim hover:text-text-main hover:bg-page-bg/60'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                <span>{cat.label}</span>
+                {cat.count > 0 && (
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-mono ${
+                    isSelected
+                      ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/20'
+                      : 'bg-border-main border border-border-main/20 text-text-dim'
+                  }`}>
+                    {cat.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Active Downloads */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">

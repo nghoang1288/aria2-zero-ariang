@@ -443,7 +443,12 @@ function AppContent({
   const fetchDiskSpace = useCallback(async () => {
     try {
       const url = getApiUrl('disk');
-      const res = await fetch(url);
+      const secret = (window as any).AriaZeroServerConfig?.rpcSecret || '';
+      const headers: Record<string, string> = {};
+      if (secret) {
+        headers['Authorization'] = `Bearer ${secret}`;
+      }
+      const res = await fetch(url, { headers });
       if (res.ok) {
         const data = await res.json();
         setDiskSpace(data);
@@ -508,9 +513,14 @@ function AppContent({
         const paths = getPathsToDelete(taskToRemove);
         if (paths.length > 0) {
           const url = getApiUrl('delete-files');
+          const secret = (window as any).AriaZeroServerConfig?.rpcSecret || '';
+          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+          if (secret) {
+            headers['Authorization'] = `Bearer ${secret}`;
+          }
           const res = await fetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({ files: paths })
           });
           
@@ -563,9 +573,14 @@ function AppContent({
         
         if (allPaths.length > 0) {
           const url = getApiUrl('delete-files');
+          const secret = (window as any).AriaZeroServerConfig?.rpcSecret || '';
+          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+          if (secret) {
+            headers['Authorization'] = `Bearer ${secret}`;
+          }
           const res = await fetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({ files: allPaths })
           });
           
@@ -609,9 +624,14 @@ function AppContent({
       if (aria2Paths.length > 0) {
         try {
           const apiUrl = getApiUrl('delete-files');
+          const secret = (window as any).AriaZeroServerConfig?.rpcSecret || '';
+          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+          if (secret) {
+            headers['Authorization'] = `Bearer ${secret}`;
+          }
           await fetch(apiUrl, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({ files: aria2Paths })
           });
         } catch (e) {
@@ -778,7 +798,7 @@ function AppContent({
         </div>
         
         {/* Navigation Tabs */}
-        <nav className="px-4 py-4 space-y-1 flex-shrink-0">
+        <nav className="px-4 py-4 space-y-1 flex-1 overflow-y-auto">
           <button 
             onClick={() => {
               setActiveTab('dashboard');
@@ -829,38 +849,6 @@ function AppContent({
             Settings
           </button>
         </nav>
-
-        {/* Categories Section */}
-        <div className="px-4 py-2 border-t border-border-main flex-1 overflow-y-auto">
-          <span className="text-[10px] text-text-dim uppercase tracking-wider font-bold block mb-2 px-2">Categories</span>
-          <div className="space-y-1">
-            {categories.map(cat => {
-              const Icon = cat.icon;
-              return (
-                <button
-                  key={cat.id}
-                  onClick={() => {
-                    setSelectedCategory(cat.id);
-                    if (isMobile) setShowMobileSidebar(false);
-                  }}
-                  className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                    selectedCategory === cat.id
-                      ? 'bg-cyan-500/10 text-cyan-400 font-semibold'
-                      : 'text-text-dim hover:bg-page-bg/40 hover:text-text-main'
-                  }`}
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                  <span>{cat.label}</span>
-                  {cat.count > 0 && (
-                    <span className="ml-auto text-[9px] bg-border-main border border-border-main/20 text-text-dim px-1.5 py-0.5 rounded-full">
-                      {cat.count}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
 
         {/* Sidebar Footer */}
         <div className="p-4 border-t border-border-main bg-page-bg/30 shrink-0">
@@ -1051,6 +1039,8 @@ function AppContent({
               stoppedTasks={stoppedTasks}
               searchQuery={searchQuery}
               selectedCategory={selectedCategory}
+              setSelectedCategory={setSelectedCategory}
+              categories={categories}
               pauseTask={pauseTask}
               resumeTask={resumeTask}
               handleInitiateRemove={handleInitiateRemove}
