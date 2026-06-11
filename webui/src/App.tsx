@@ -509,38 +509,39 @@ function AppContent({
     
     setIsDeletingFiles(true);
     try {
-      if (deleteFilesOnDisk) {
-        const paths = getPathsToDelete(taskToRemove);
-        if (paths.length > 0) {
-          const url = getApiUrl('delete-files');
-          const secret = (window as any).AriaZeroServerConfig?.rpcSecret || '';
-          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-          if (secret) {
-            headers['Authorization'] = `Bearer ${secret}`;
-          }
-          const res = await fetch(url, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ files: paths })
-          });
-          
-          if (!res.ok) {
-            console.error('Failed to delete files on disk');
-          } else {
-            const data = await res.json();
-            if (data.errors && data.errors.length > 0) {
-              showToast({
-                type: 'warning',
-                title: 'Partial file deletion',
-                message: data.errors.join(', ')
-              });
-            } else {
-              showToast({
-                type: 'success',
-                title: 'Files deleted',
-                message: 'Successfully deleted downloaded files from disk.'
-              });
-            }
+      const paths = deleteFilesOnDisk
+        ? getPathsToDelete(taskToRemove)
+        : getPathsToDelete(taskToRemove).filter(p => p.endsWith('.aria2'));
+        
+      if (paths.length > 0) {
+        const url = getApiUrl('delete-files');
+        const secret = (window as any).AriaZeroServerConfig?.rpcSecret || '';
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (secret) {
+          headers['Authorization'] = `Bearer ${secret}`;
+        }
+        const res = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ files: paths })
+        });
+        
+        if (!res.ok) {
+          console.error('Failed to delete files on disk');
+        } else {
+          const data = await res.json();
+          if (data.errors && data.errors.length > 0) {
+            showToast({
+              type: 'warning',
+              title: 'Partial file deletion',
+              message: data.errors.join(', ')
+            });
+          } else if (deleteFilesOnDisk) {
+            showToast({
+              type: 'success',
+              title: 'Files deleted',
+              message: 'Successfully deleted downloaded files from disk.'
+            });
           }
         }
       }
@@ -565,40 +566,43 @@ function AppContent({
   const handleConfirmClearAll = async () => {
     setIsClearingAll(true);
     try {
-      if (deleteClearAllFiles) {
-        const allPaths: string[] = [];
-        for (const task of stoppedTasks) {
-          allPaths.push(...getPathsToDelete(task));
+      const allPaths: string[] = [];
+      for (const task of stoppedTasks) {
+        const paths = getPathsToDelete(task);
+        if (deleteClearAllFiles) {
+          allPaths.push(...paths);
+        } else {
+          allPaths.push(...paths.filter(p => p.endsWith('.aria2')));
         }
+      }
+      
+      if (allPaths.length > 0) {
+        const url = getApiUrl('delete-files');
+        const secret = (window as any).AriaZeroServerConfig?.rpcSecret || '';
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (secret) {
+          headers['Authorization'] = `Bearer ${secret}`;
+        }
+        const res = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ files: allPaths })
+        });
         
-        if (allPaths.length > 0) {
-          const url = getApiUrl('delete-files');
-          const secret = (window as any).AriaZeroServerConfig?.rpcSecret || '';
-          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-          if (secret) {
-            headers['Authorization'] = `Bearer ${secret}`;
-          }
-          const res = await fetch(url, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ files: allPaths })
-          });
-          
-          if (res.ok) {
-            const data = await res.json();
-            if (data.errors && data.errors.length > 0) {
-              showToast({
-                type: 'warning',
-                title: 'Partial file deletion',
-                message: 'Some files could not be deleted.'
-              });
-            } else {
-              showToast({
-                type: 'success',
-                title: 'Files deleted',
-                message: 'Successfully deleted files for all stopped tasks.'
-              });
-            }
+        if (res.ok) {
+          const data = await res.json();
+          if (data.errors && data.errors.length > 0) {
+            showToast({
+              type: 'warning',
+              title: 'Partial file deletion',
+              message: 'Some files could not be deleted.'
+            });
+          } else if (deleteClearAllFiles) {
+            showToast({
+              type: 'success',
+              title: 'Files deleted',
+              message: 'Successfully deleted files for all stopped tasks.'
+            });
           }
         }
       }
