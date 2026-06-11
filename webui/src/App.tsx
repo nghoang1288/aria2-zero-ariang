@@ -509,12 +509,33 @@ function AppContent({
   };
 
   // Retry logic
-  const retryTask = useCallback((task: Aria2Task) => {
+  const retryTask = useCallback(async (task: Aria2Task) => {
     const url = task.infoHash 
       ? `magnet:?xt=urn:btih:${task.infoHash}` 
       : (task.files?.[0]?.uris?.[0]?.uri || null);
       
     if (url) {
+      // Deleting the corrupted .aria2 control file on disk first
+      const aria2Paths = getPathsToDelete(task).filter(p => p.endsWith('.aria2'));
+      if (aria2Paths.length > 0) {
+        try {
+          const devHost = '192.168.50.226';
+          const devPort = '16980';
+          const host = location.port === '5173' ? devHost : location.hostname;
+          const port = location.port === '5173' ? devPort : (location.port || (location.protocol === 'https:' ? '443' : '80'));
+          const protocol = location.protocol === 'https:' ? 'https' : 'http';
+          const apiUrl = `${protocol}://${host}:${port}/api/delete-files`;
+
+          await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ files: aria2Paths })
+          });
+        } catch (e) {
+          console.error('Failed to clean up .aria2 control file before retry:', e);
+        }
+      }
+
       addUri(url);
       removeTask(task.gid, task.status);
       showToast({
@@ -522,6 +543,7 @@ function AppContent({
         title: 'Retrying Download',
         message: `Started retrying task: ${getTaskName(task)}`
       });
+      setTimeout(fetchDiskSpace, 1000);
     } else {
       showToast({
         type: 'error',
@@ -529,7 +551,7 @@ function AppContent({
         message: 'Could not retrieve original download link for this task.'
       });
     }
-  }, [addUri, removeTask, showToast]);
+  }, [addUri, removeTask, showToast, getPathsToDelete, fetchDiskSpace]);
 
   // Helper category detection
   const getFileExtension = (task: Aria2Task): string => {
